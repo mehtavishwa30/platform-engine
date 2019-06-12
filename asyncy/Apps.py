@@ -285,11 +285,6 @@ class Apps:
             """
             curs.execute(query, (app_id,))
             release = curs.fetchone()
-            if release is None:
-                glogger.warn(f'Cowardly refusing to deploy app '
-                     f'{app_id}. No release data found.')
-                return
-
             version = release[1]
             environment = release[2]
             stories = release[3]

@@ -135,7 +135,7 @@ class Kubernetes:
 
         cert = config.CLUSTER_CERT
         cert = cert.replace('\\n', '\n')
-        context.load_verify_locations(cadata=cert)
+        #context.load_verify_locations(cadata=cert)
 
         kwargs = {
             'ssl_options': context,
@@ -461,8 +461,9 @@ class Kubernetes:
 
         b16_service_name = base64.b16encode(service_name.encode()).decode()
 
-        if app.always_pull_images:
-            app.logger.debug(f'imagePullPolicy set to Always')
+        image_pull_policy = 'Always' if app.always_pull_images else 'IfNotPresent'
+
+        app.logger.debug(f'imagePullPolicy set to {image_pull_policy}')
 
         payload = {
             'apiVersion': 'apps/v1',
@@ -501,7 +502,7 @@ class Kubernetes:
                                     }
                                 },
                                 'command': start_command,
-                                'imagePullPolicy': 'Always' if app.always_pull_images else 'IfNotPresent',
+                                'imagePullPolicy': image_pull_policy,
                                 'env': env_k8s,
                                 'lifecycle': {
                                 },
