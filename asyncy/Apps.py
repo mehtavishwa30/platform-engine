@@ -76,7 +76,8 @@ class Apps:
     @classmethod
     async def deploy_release(cls, config, app_id, app_dns,
                              version, environment, stories,
-                             maintenance: bool, deleted: bool, owner_uuid):
+                             maintenance: bool, deleted: bool,
+                             always_pull_images: bool, owner_uuid):
         logger = cls.make_logger_for_app(config, app_id, version)
         logger.info(f'Deploying app {app_id}@{version}')
 
@@ -125,8 +126,8 @@ class Apps:
 
             app_config = cls.get_app_config(raw=stories.get('yaml', {}))
 
-            app = App(app_id, app_dns, version, config, logger,
-                      stories, services, environment, owner_uuid, app_config)
+            app = App(app_id, app_dns, version, config, logger, stories,
+                      services, always_pull_images, environment, owner_uuid, app_config)
 
             await Containers.clean_app(app)
 
@@ -274,7 +275,7 @@ class Apps:
                             from releases
                             where state != 'NO_DEPLOY'::release_state
                             group by app_uuid)
-            select app_uuid, id, config, payload, maintenance,
+            select app_uuid, id, config, payload, always_pull_images, maintenance,
                    hostname, state, deleted, apps.owner_uuid
             from latest
                    inner join releases using (app_uuid, id)
@@ -284,14 +285,21 @@ class Apps:
             """
             curs.execute(query, (app_id,))
             release = curs.fetchone()
+            if release is None:
+                glogger.warn(f'Cowardly refusing to deploy app '
+                     f'{app_id}. No release data found.')
+                return
+
             version = release[1]
             environment = release[2]
             stories = release[3]
-            maintenance = release[4]
-            app_dns = release[5]
-            state = release[6]
-            deleted = release[7]
-            owner_uuid = release[8]
+            always_pull_images = release[4]
+            maintenance = release[5]
+            app_dns = release[6]
+            state = release[7]
+            deleted = release[8]
+            owner_uuid = release[9]
+
             if state == ReleaseState.FAILED.value:
                 glogger.warn(f'Cowardly refusing to deploy app '
                              f'{app_id}@{version} as it\'s '
@@ -302,10 +310,11 @@ class Apps:
                 glogger.info(f'No story found for deployment for '
                              f'app {app_id}@{version}. Halting deployment.')
                 return
+
             await asyncio.wait_for(
                 cls.deploy_release(
                     config, app_id, app_dns, version,
-                    environment, stories, maintenance, deleted, owner_uuid),
+                    environment, stories, maintenance, deleted, always_pull_images, owner_uuid),
                 timeout=5 * 60)
             glogger.info(f'Reloaded app {app_id}@{version}')
         except BaseException as e:

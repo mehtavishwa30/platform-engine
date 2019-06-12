@@ -461,6 +461,9 @@ class Kubernetes:
 
         b16_service_name = base64.b16encode(service_name.encode()).decode()
 
+        if app.always_pull_images:
+            app.logger.debug(f'imagePullPolicy set to Always')
+
         payload = {
             'apiVersion': 'apps/v1',
             'kind': 'Deployment',
@@ -498,7 +501,7 @@ class Kubernetes:
                                     }
                                 },
                                 'command': start_command,
-                                'imagePullPolicy': 'Always',
+                                'imagePullPolicy': 'Always' if app.always_pull_images else 'IfNotPresent',
                                 'env': env_k8s,
                                 'lifecycle': {
                                 },

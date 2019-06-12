@@ -145,6 +145,7 @@ class Containers:
         story.logger.info(f'Starting container {service}')
         container_name = cls.get_container_name(story.app, story.name,
                                                 line, service)
+
         await cls.create_and_start(story.app, line, service, container_name)
         hostname = await cls.get_hostname(story, line, service)
 

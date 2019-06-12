@@ -36,7 +36,7 @@ class App:
     """
 
     def __init__(self, app_id: str, app_dns: str, version: int, config: Config,
-                 logger: Logger, stories: dict, services: dict,
+                 logger: Logger, stories: dict, services: dict, always_pull_images: bool,
                  environment: dict, owner_uuid: str, app_config: AppConfig):
         self._subscriptions = {}
         self.app_id = app_id
@@ -53,6 +53,7 @@ class App:
         self.stories = stories['stories']
         self.entrypoint = stories['entrypoint']
         self.services = services
+        self.always_pull_images = always_pull_images
         secrets = CaseInsensitiveDict()
         for k, v in self.environment.items():
             if not isinstance(v, dict):
