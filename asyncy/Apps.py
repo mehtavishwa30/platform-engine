@@ -76,8 +76,8 @@ class Apps:
     @classmethod
     async def deploy_release(cls, config, app_id, app_dns,
                              version, environment, stories,
-                             maintenance: bool, deleted: bool,
-                             always_pull_images: bool, owner_uuid):
+                             always_pull_images: bool,
+                             maintenance: bool, deleted: bool, owner_uuid):
         logger = cls.make_logger_for_app(config, app_id, version)
         logger.info(f'Deploying app {app_id}@{version}')
 
@@ -309,7 +309,7 @@ class Apps:
             await asyncio.wait_for(
                 cls.deploy_release(
                     config, app_id, app_dns, version,
-                    environment, stories, maintenance, deleted, always_pull_images, owner_uuid),
+                    environment, stories, always_pull_images, maintenance, deleted, owner_uuid),
                 timeout=5 * 60)
             glogger.info(f'Reloaded app {app_id}@{version}')
         except BaseException as e:

@@ -170,8 +170,8 @@ async def test_reload_app_no_story(patch, config, logger, db, async_mock):
     patch.object(Apps, 'destroy_app', new=async_mock())
     patch.object(Apps, 'deploy_release', new=async_mock())
 
-    release = ['app_id', 'version', 'env', None, 'maintenance', app_dns,
-               'QUEUED']
+    release = ['app_id', 'version', 'env', None, False, 'maintenance', app_dns,
+               'QUEUED', False, 'owner_uuid']
     conn.cursor().fetchone.return_value = release
 
     await Apps.reload_app(config, logger, app_id)
@@ -201,7 +201,7 @@ async def test_reload_app(patch, config, logger, db, async_mock,
     else:
         patch.object(Apps, 'deploy_release', new=async_mock())
 
-    release = ['app_id', 'version', 'env', 'stories', 'maintenance', app_dns,
+    release = ['app_id', 'version', 'env', 'stories', False, 'maintenance', app_dns,
                previous_state, False, 'owner_uuid']
     conn.cursor().fetchone.return_value = release
 
@@ -217,7 +217,7 @@ async def test_reload_app(patch, config, logger, db, async_mock,
 
     Apps.deploy_release.mock.assert_called_with(
         config, app_id, app_dns,
-        release[1], release[2], release[3], release[4], release[7], release[8])
+        release[1], release[2], release[3], release[4], release[5], release[8], release[9])
 
     if raise_exc:
         logger.error.assert_called()
