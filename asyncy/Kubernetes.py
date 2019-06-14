@@ -5,6 +5,7 @@ import json
 import ssl
 import time
 import typing
+import urllib.parse
 from asyncio import TimeoutError
 
 from tornado.httpclient import AsyncHTTPClient, HTTPResponse
@@ -86,7 +87,7 @@ class Kubernetes:
         }
 
         prefix = cls._get_api_path_prefix('ingresses')
-        res = await cls.make_k8s_call(app,
+        res = await cls.make_k8s_call(app.config, app.logger,
                                       f'{prefix}/{app.app_id}/ingresses',
                                       payload=payload)
 
@@ -97,7 +98,7 @@ class Kubernetes:
 
     @classmethod
     async def create_namespace(cls, app):
-        res = await cls.make_k8s_call(app,
+        res = await cls.make_k8s_call(app.config, app.logger,
                                       f'/api/v1/namespaces/{app.app_id}')
 
         if res.code == 200:
@@ -113,8 +114,8 @@ class Kubernetes:
             }
         }
 
-        res = await cls.make_k8s_call(app, '/api/v1/namespaces',
-                                      payload=payload)
+        res = await cls.make_k8s_call(app.config, app.logger,
+                                      '/api/v1/namespaces', payload=payload)
 
         if not cls.is_2xx(res):
             raise K8sError('Failed to create namespace!')
@@ -126,11 +127,9 @@ class Kubernetes:
         return ssl.SSLContext()
 
     @classmethod
-    async def make_k8s_call(cls, app, path: str,
+    async def make_k8s_call(cls, config, logger, path: str,
                             payload: dict = None,
                             method: str = 'get') -> HTTPResponse:
-        config = app.config
-
         context = cls.new_ssl_context()
 
         cert = config.CLUSTER_CERT
@@ -158,7 +157,7 @@ class Kubernetes:
 
         client = AsyncHTTPClient()
         return await HttpUtils.fetch_with_retry(
-            3, app.logger, f'https://{app.config.CLUSTER_HOST}{path}',
+            3, logger, f'https://{config.CLUSTER_HOST}{path}',
             client, kwargs)
 
     @classmethod
@@ -171,7 +170,7 @@ class Kubernetes:
         path = f'{prefix}/{app.app_id}' \
             f'/{resource}/{name}'
 
-        res = await cls.make_k8s_call(app, path)
+        res = await cls.make_k8s_call(app.config, app.logger, path)
         if res.code == 404:
             return False
         elif res.code == 200:
@@ -191,7 +190,8 @@ class Kubernetes:
                 }
             }
         }
-        res = await cls.make_k8s_call(app, path, payload, method='patch')
+        res = await cls.make_k8s_call(app.config, app.logger,
+                                      path, payload, method='patch')
         cls.raise_if_not_2xx(res)
         app.logger.debug(
             f'Updated reference time for volume {name}')
@@ -227,7 +227,7 @@ class Kubernetes:
             }
         }
 
-        res = await cls.make_k8s_call(app, path, payload)
+        res = await cls.make_k8s_call(app.config, app.logger, path, payload)
         cls.raise_if_not_2xx(res)
         app.logger.debug(f'Created a Kubernetes volume - {name}')
 
@@ -248,8 +248,8 @@ class Kubernetes:
     async def _list_resource_names(cls, app, resource) -> typing.List[str]:
         prefix = cls._get_api_path_prefix(resource)
         res = await cls.make_k8s_call(
-            app, f'{prefix}/{app.app_id}/{resource}'
-                 f'?includeUninitialized=true')
+            app.config, app.logger, f'{prefix}/{app.app_id}/{resource}'
+            f'?includeUninitialized=true')
 
         body = json.loads(res.body, encoding='utf-8')
         out = []
@@ -269,7 +269,7 @@ class Kubernetes:
         """
         prefix = cls._get_api_path_prefix(resource)
         res = await cls.make_k8s_call(
-            app,
+            app.config, app.logger,
             f'{prefix}/{app.app_id}/{resource}/{name}'
             f'?gracePeriodSeconds=0',
             method='delete')
@@ -287,7 +287,8 @@ class Kubernetes:
         # Wait until the resource has actually been killed.
         while True:
             res = await cls.make_k8s_call(
-                app, f'{prefix}/{app.app_id}/{resource}/{name}')
+                app.config, app.logger,
+                f'{prefix}/{app.app_id}/{resource}/{name}')
 
             if res.code == 404:
                 break
@@ -386,7 +387,7 @@ class Kubernetes:
         }
 
         path = f'/api/v1/namespaces/{app.app_id}/services'
-        res = await cls.make_k8s_call(app, path, payload)
+        res = await cls.make_k8s_call(app.config, app.logger, path, payload)
         cls.raise_if_not_2xx(res)
 
         # Wait until the ports of the destination pod are open.
@@ -413,6 +414,34 @@ class Kubernetes:
                 await asyncio.sleep(timeout_secs)
 
         return False
+
+    @classmethod
+    async def check_for_image_errors(cls, app, container_name):
+        # List of image pull errors taken from the kubernetes source code
+        # github/kubernetes/kubernetes/blob/master/pkg/kubelet/images/types.go
+        image_errors = [
+            'ImagePullBackOff',
+            'ImageInspectError',
+            'ErrImagePull',
+            'ErrImageNeverPull',
+            'RegistryUnavailable',
+            'InvalidImageName'
+        ]
+        prefix = cls._get_api_path_prefix('pods')
+        qs = urllib.parse.urlencode({
+            'labelSelector': f'app={container_name}'
+        })
+        res = await cls.make_k8s_call(app, f'{prefix}/{app.app_id}/pods?{qs}')
+        cls.raise_if_not_2xx(res)
+        body = json.loads(res.body, encoding='utf-8')
+        for pod in body['items']:
+            for container_status in pod['status'].get('containerStatuses', []):
+                is_waiting = container_status['state'].get('waiting', False)
+                if is_waiting and is_waiting['reason'] in image_errors:
+                    raise K8sError(
+                        message=f'{is_waiting["reason"]} - '
+                        f'Failed to pull image {container_status["image"]}'
+                    )
 
     @classmethod
     async def create_deployment(cls, app, service_name: str, image: str,
@@ -532,7 +561,8 @@ class Kubernetes:
         res = None
         while tries < 10:
             tries = tries + 1
-            res = await cls.make_k8s_call(app, path, payload)
+            res = await cls.make_k8s_call(app.config, app.logger,
+                                          path, payload)
             if cls.is_2xx(res):
                 break
 
@@ -547,12 +577,13 @@ class Kubernetes:
         # Wait until the deployment is ready.
         app.logger.debug('Waiting for deployment to be ready...')
         while True:
-            res = await cls.make_k8s_call(app, path)
+            res = await cls.make_k8s_call(app.config, app.logger, path)
             cls.raise_if_not_2xx(res)
             body = json.loads(res.body, encoding='utf-8')
             if body['status'].get('readyReplicas', 0) > 0:
                 break
 
+            await cls.check_for_image_errors(app, container_name)
             await asyncio.sleep(1)
 
         app.logger.debug('Deployment is ready')
@@ -563,7 +594,7 @@ class Kubernetes:
                          shutdown_command: [] or str, env: dict,
                          volumes: Volumes):
         res = await cls.make_k8s_call(
-            app,
+            app.config, app.logger,
             f'/apis/apps/v1/namespaces/{app.app_id}'
             f'/deployments/{container_name}')
 

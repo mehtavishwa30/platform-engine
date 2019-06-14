@@ -100,7 +100,7 @@ async def test_create_namespace_if_required_existing(patch, app,
 
     Kubernetes.make_k8s_call.mock.assert_called_once()
     Kubernetes.make_k8s_call.mock.assert_called_with(
-        app, '/api/v1/namespaces/my_app')
+        app.config, app.logger, '/api/v1/namespaces/my_app')
 
 
 @mark.asyncio
@@ -133,8 +133,9 @@ async def test_create_namespace_if_required(patch, app,
     }
 
     assert Kubernetes.make_k8s_call.mock.mock_calls == [
-        mock.call(app, '/api/v1/namespaces/my_app'),
-        mock.call(app, '/api/v1/namespaces', payload=expected_payload)
+        mock.call(app.config, app.logger, '/api/v1/namespaces/my_app'),
+        mock.call(app.config, app.logger, '/api/v1/namespaces',
+                  payload=expected_payload)
     ]
 
 
@@ -206,13 +207,16 @@ async def test_delete_resource(patch, story, async_mock, first_res, resource):
     prefix = Kubernetes._get_api_path_prefix(resource)
 
     assert Kubernetes.make_k8s_call.mock.mock_calls == [
-        mock.call(story.app,
+        mock.call(story.app.config, story.app.logger,
                   f'{prefix}/my_app/{resource}/foo'
                   f'?gracePeriodSeconds=0',
                   method='delete'),
-        mock.call(story.app, f'{prefix}/my_app/{resource}/foo'),
-        mock.call(story.app, f'{prefix}/my_app/{resource}/foo'),
-        mock.call(story.app, f'{prefix}/my_app/{resource}/foo'),
+        mock.call(story.app.config, story.app.logger,
+                  f'{prefix}/my_app/{resource}/foo'),
+        mock.call(story.app.config, story.app.logger,
+                  f'{prefix}/my_app/{resource}/foo'),
+        mock.call(story.app.config, story.app.logger,
+                  f'{prefix}/my_app/{resource}/foo'),
     ]
 
 
@@ -253,8 +257,8 @@ async def test_make_k8s_call(patch, story, async_mock, method):
         expected_kwargs['headers']['Content-Type'] = \
             'application/merge-patch+json; charset=utf-8'
 
-    assert await Kubernetes.make_k8s_call(story.app, path, payload,
-                                          method=method) \
+    assert await Kubernetes.make_k8s_call(story.app.config, story.app.logger,
+                                          path, payload, method=method) \
         == HttpUtils.fetch_with_retry.mock.return_value
 
     HttpUtils.fetch_with_retry.mock.assert_called_with(
@@ -299,7 +303,9 @@ async def test_does_resource_exist(patch, story, resource,
 
     expected_path = Kubernetes._get_api_path_prefix(resource) + \
         f'/{story.app.app_id}/{resource}/name'
-    Kubernetes.make_k8s_call.mock.assert_called_with(story.app, expected_path)
+    Kubernetes.make_k8s_call.mock.assert_called_with(story.app.config,
+                                                     story.app.logger,
+                                                     expected_path)
 
 
 @mark.asyncio
@@ -317,7 +323,7 @@ async def test_list_resource_names(story, patch, async_mock):
     patch.object(Kubernetes, '_get_api_path_prefix', return_value='prefix')
     ret = await Kubernetes._list_resource_names(story.app, 'services')
     Kubernetes.make_k8s_call.mock.assert_called_with(
-        story.app,
+        story.app.config, story.app.logger,
         f'prefix/{story.app.app_id}/services?includeUninitialized=true')
 
     assert ret == ['hello', 'world']
@@ -348,7 +354,7 @@ async def test_create_pod(patch, async_mock, story, line, res_code):
         container_name, start_command, None, env, [])
 
     Kubernetes.make_k8s_call.mock.assert_called_with(
-        story.app,
+        story.app.config, story.app.logger,
         '/apis/apps/v1/namespaces/my_app/deployments/asyncy--alpine-1')
 
     if res_code == 200:
@@ -409,7 +415,8 @@ async def test_create_volume(story, patch, async_mock,
     else:
         Kubernetes._update_volume_label.mock.assert_not_called()
         Kubernetes.make_k8s_call.mock.assert_called_with(
-            story.app, expected_path, expected_payload)
+            story.app.config, story.app.logger,
+            expected_path, expected_payload)
         Kubernetes.raise_if_not_2xx.assert_called_with(res)
 
 
@@ -433,7 +440,7 @@ async def test_update_volume_label(story, patch, async_mock):
     path = f'/api/v1/namespaces/{story.app.app_id}/persistentvolumeclaims/db'
 
     Kubernetes.make_k8s_call.mock.assert_called_with(
-        story.app, path, payload, method='patch')
+        story.app.config, story.app.logger, path, payload, method='patch')
     Kubernetes.raise_if_not_2xx.assert_called_with(res)
 
 
@@ -540,7 +547,7 @@ async def test_create_ingress(patch, app, async_mock, resource_exists,
         prefix = Kubernetes._get_api_path_prefix('ingresses')
         prefix = f'{prefix}/{app.app_id}/ingresses'
         Kubernetes.make_k8s_call.mock.assert_called_with(
-            app, prefix, payload=expected_payload)
+            app.config, app.logger, prefix, payload=expected_payload)
 
         Kubernetes.is_2xx.assert_called_with(314)
 
@@ -642,6 +649,7 @@ async def test_create_deployment(patch, async_mock, story):
     }
 
     patch.object(asyncio, 'sleep', new=async_mock())
+    patch.object(Kubernetes, 'check_for_image_errors', new=async_mock())
 
     expected_create_path = f'/apis/apps/v1/namespaces/' \
                            f'{story.app.app_id}/deployments'
@@ -671,11 +679,13 @@ async def test_create_deployment(patch, async_mock, story):
     ]
 
     assert Kubernetes.make_k8s_call.mock.mock_calls == [
-        mock.call(story.app, expected_create_path, expected_payload),
-        mock.call(story.app, expected_create_path, expected_payload),
-        mock.call(story.app, expected_verify_path),
-        mock.call(story.app, expected_verify_path),
-        mock.call(story.app, expected_verify_path)
+        mock.call(story.app.config, story.app.logger,
+                  expected_create_path, expected_payload),
+        mock.call(story.app.config, story.app.logger,
+                  expected_create_path, expected_payload),
+        mock.call(story.app.config, story.app.logger, expected_verify_path),
+        mock.call(story.app.config, story.app.logger, expected_verify_path),
+        mock.call(story.app.config, story.app.logger, expected_verify_path)
     ]
 
 
@@ -746,7 +756,7 @@ async def test_create_service(patch, story, async_mock):
     await Kubernetes.create_service(story.app, line[LineConstants.service],
                                     container_name)
     Kubernetes.make_k8s_call.mock.assert_called_with(
-        story.app, expected_path, expected_payload)
+        story.app.config, story.app.logger, expected_path, expected_payload)
 
     Kubernetes.raise_if_not_2xx.assert_called_with(
         Kubernetes.make_k8s_call.mock.return_value)
@@ -755,6 +765,48 @@ async def test_create_service(patch, story, async_mock):
         mock.call(container_name, 20),
         mock.call(container_name, 30)
     ]
+
+
+@mark.asyncio
+async def test_check_for_image_errors(patch, app, async_mock):
+
+    app.app_id = 'my_app'
+
+    patch.object(Kubernetes, 'make_k8s_call', new=async_mock(side_effect=[
+        _create_response(200, {
+            'items': [{
+                'status': {
+                    'containerStatuses': [{
+                        'image': 'test',
+                        'state': {
+                            'waiting': {
+                                'reason': 'ContainerCreating'
+                            }
+                        }
+                    }]
+                }
+            }]
+        }),
+        _create_response(200, {
+            'items': [{
+                'status': {
+                    'containerStatuses': [{
+                        'image': 'test',
+                        'state': {
+                            'waiting': {
+                                'reason': 'ImagePullBackOff'
+                            }
+                        }
+                    }]
+                }
+            }]
+        }),
+    ]))
+
+    await Kubernetes.check_for_image_errors(app, 'my_container')
+    with pytest.raises(K8sError) as exc:
+        await Kubernetes.check_for_image_errors(app, 'my_container')
+    assert exc.value.message == 'ImagePullBackOff - Failed to pull image test'
 
 
 def test_is_2xx():
