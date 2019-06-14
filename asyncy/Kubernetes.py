@@ -135,7 +135,7 @@ class Kubernetes:
 
         cert = config.CLUSTER_CERT
         cert = cert.replace('\\n', '\n')
-        #context.load_verify_locations(cadata=cert)
+        context.load_verify_locations(cadata=cert)
 
         kwargs = {
             'ssl_options': context,
