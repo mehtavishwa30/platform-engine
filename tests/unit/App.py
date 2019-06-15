@@ -32,7 +32,7 @@ def exc(patch):
 @fixture
 def app(config, logger, magic):
     return App('app_id', 'app_dns', logger, config,
-               magic(), magic(), magic(), {}, 'owner_uuid', magic())
+               magic(), magic(), magic(), False, {}, 'owner_uuid', magic())
 
 
 def test_add_subscription(patch, app, magic):
@@ -132,7 +132,7 @@ def test_app_init(magic, config, logger, env):
     app_config = magic()
     config.APP_DOMAIN = 'asyncyapp.com'
     app = App('app_id', 'app_dns', version, config, logger,
-              stories, services, env, 'owner_1', app_config)
+              stories, services, False, env, 'owner_1', app_config)
 
     if env is None:
         env = {}
@@ -144,6 +144,7 @@ def test_app_init(magic, config, logger, env):
     assert app.owner_uuid == 'owner_1'
     assert app.stories == stories['stories']
     assert app.services == services
+    assert app.always_pull_images == False
     assert app.environment == env
     assert app.app_context['hostname'] == f'{app.app_dns}.asyncyapp.com'
     assert app.app_context['version'] == version

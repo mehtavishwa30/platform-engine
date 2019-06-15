@@ -250,7 +250,7 @@ async def test_deploy_release_many_services(patch):
         stories['services'][f'service_{i}'] = {}
 
     await Apps.deploy_release({}, 'app_id', 'app_dns', 'app_version', {},
-                              stories, False, False, 'owner_uuid')
+                              stories, False, False, False, 'owner_uuid')
 
     TooManyServices.__init__.assert_called_with(20, 15)
     Apps.update_release_state.assert_called()
@@ -272,7 +272,7 @@ async def test_deploy_release_many_apps(patch, magic):
             stories['services'][f'service_{i}'] = {}
 
         await Apps.deploy_release({}, 'app_id', 'app_dns', 'app_version', {},
-                                  stories, False, False, 'owner_uuid')
+                                  stories, False, False, False, 'owner_uuid')
 
         TooManyActiveApps.__init__.assert_called_with(20, 5)
         Apps.update_release_state.assert_called()
@@ -309,7 +309,7 @@ async def test_deploy_release_many_volumes(patch, async_mock):
                  new=async_mock(return_value=stories['services']))
 
     await Apps.deploy_release({}, 'app_id', 'app_dns', 'app_version', {},
-                              stories, False, False, 'owner_uuid')
+                              stories, False, False, False, 'owner_uuid')
 
     TooManyVolumes.__init__.assert_called_with(20, 15)
     Apps.update_release_state.assert_called()
@@ -342,7 +342,7 @@ async def test_deploy_release(config, magic, patch, deleted,
 
     await Apps.deploy_release(
         config, 'app_id', 'app_dns', 'version', 'env',
-        {'stories': True}, maintenance, deleted, 'owner_uuid')
+        {'stories': True}, False, maintenance, deleted, 'owner_uuid')
 
     if maintenance:
         assert Apps.update_release_state.call_count == 0
@@ -358,7 +358,7 @@ async def test_deploy_release(config, magic, patch, deleted,
         App.__init__.assert_called_with(
             'app_id', 'app_dns', 'version', config,
             app_logger,
-            {'stories': True}, services, 'env', 'owner_uuid', app_config)
+            {'stories': True}, services, False, 'env', 'owner_uuid', app_config)
         App.bootstrap.mock.assert_called()
         Containers.init.mock.assert_called()
         if raise_exc is not None:
