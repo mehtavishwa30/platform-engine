@@ -431,7 +431,8 @@ class Kubernetes:
         qs = urllib.parse.urlencode({
             'labelSelector': f'app={container_name}'
         })
-        res = await cls.make_k8s_call(app, f'{prefix}/{app.app_id}/pods?{qs}')
+        res = await cls.make_k8s_call(app.config, app.logger,
+                                      f'{prefix}/{app.app_id}/pods?{qs}')
         cls.raise_if_not_2xx(res)
         body = json.loads(res.body, encoding='utf-8')
         for pod in body['items']:

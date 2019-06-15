@@ -4,6 +4,7 @@ import base64
 import json
 import ssl
 import time
+import urllib.parse
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -770,6 +771,7 @@ async def test_create_service(patch, story, async_mock):
 @mark.asyncio
 async def test_check_for_image_errors(patch, app, async_mock):
 
+    container_name = 'my_container'
     app.app_id = 'my_app'
 
     patch.object(Kubernetes, 'make_k8s_call', new=async_mock(side_effect=[
@@ -803,10 +805,19 @@ async def test_check_for_image_errors(patch, app, async_mock):
         }),
     ]))
 
-    await Kubernetes.check_for_image_errors(app, 'my_container')
+    await Kubernetes.check_for_image_errors(app, container_name)
     with pytest.raises(K8sError) as exc:
-        await Kubernetes.check_for_image_errors(app, 'my_container')
+        await Kubernetes.check_for_image_errors(app, container_name)
     assert exc.value.message == 'ImagePullBackOff - Failed to pull image test'
+
+    prefix = Kubernetes._get_api_path_prefix('pods')
+    qs = urllib.parse.urlencode({
+        'labelSelector': f'app={container_name}'
+    })
+    Kubernetes.make_k8s_call.mock.assert_called()
+    Kubernetes.make_k8s_call.mock.assert_called_with(app.config, app.logger,
+                                                     f'{prefix}/{app.app_id}'
+                                                     f'/pods?{qs}')
 
 
 def test_is_2xx():
