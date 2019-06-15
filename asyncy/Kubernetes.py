@@ -245,6 +245,9 @@ class Kubernetes:
                 resource == 'pods' or \
                 resource == 'secrets':
             return '/api/v1/namespaces'
+        elif resource == 'metrics':
+            return '/apis/metrics.k8s.io/v1beta1'
+
         else:
             raise Exception(f'Unsupported resource type {resource}')
 

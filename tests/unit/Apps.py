@@ -16,6 +16,7 @@ from asyncy.GraphQLAPI import GraphQLAPI
 from asyncy.Kubernetes import Kubernetes
 from asyncy.Logger import Logger
 from asyncy.Sentry import Sentry
+from asyncy.ServiceUsage import ServiceUsage
 from asyncy.constants.ServiceConstants import ServiceConstants
 from asyncy.db.Database import Database
 from asyncy.entities.Release import Release
@@ -138,9 +139,14 @@ async def test_init_all(patch, magic, async_mock, config, logger, db):
     Sentry.init.assert_called_with('sentry_dsn', 'release_ver')
 
     loop = asyncio.get_event_loop()
-    Thread.__init__.assert_called_with(target=Apps.listen_to_releases,
-                                       args=[config, logger, loop],
-                                       daemon=True)
+    assert Thread.__init__.mock_calls == [
+        mock.call(target=Apps.listen_to_releases,
+                  args=[config, logger, loop],
+                  daemon=True),
+        mock.call(target=ServiceUsage.start_recording,
+                  args=[config, logger, loop],
+                  daemon=True),
+    ]
     Thread.start.assert_called()
 
 

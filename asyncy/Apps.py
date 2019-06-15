@@ -17,6 +17,7 @@ from .Exceptions import StoryscriptError, TooManyActiveApps, TooManyServices, \
 from .GraphQLAPI import GraphQLAPI
 from .Logger import Logger
 from .Sentry import Sentry
+from .ServiceUsage import ServiceUsage
 from .constants.ServiceConstants import ServiceConstants
 from .db.Database import Database
 from .enums.ReleaseState import ReleaseState
@@ -172,6 +173,11 @@ class Apps:
                                             args=[config, glogger, loop],
                                             daemon=True)
         release_listener.start()
+
+        usage_recorder = threading.Thread(target=ServiceUsage.start_recording,
+                                          args=[config, glogger, loop],
+                                          daemon=True)
+        usage_recorder.start()
 
         await cls.reload_apps(config, glogger)
 
