@@ -1,3 +1,4 @@
+from statistics import mean
 from typing import Dict, List
 
 import psycopg2
@@ -115,9 +116,9 @@ class Database:
         query = f"""
         select cpu_units, memory_bytes
         from service_usage
-        where service_uuid='{service['uuid']}';
+        where service_uuid = %s;
         """
-        cur.execute(query)
+        cur.execute(query, (service['uuid'],))
         res = cur.fetchone()
         if res is None:
             query = f"""
@@ -141,7 +142,47 @@ class Database:
         query = f"""
         update service_usage
         set cpu_units = %s, memory_bytes = %s
-        where service_uuid='{service['uuid']}';
+        where service_uuid = %s;
         """
-        cur.execute(query, tuple(data.values()))
+        cur.execute(query, (*tuple(data.values()), service['uuid']))
         conn.commit()
+
+    @classmethod
+    def get_service_by_alias(cls, config: Config, service_alias) -> Dict:
+        conn, cur = cls.new_pg_conn(config)
+        query = f"""
+        select uuid from services where alias = %s
+        """
+        cur.execute(query, (service_alias,))
+        return cur.fetchone()
+
+    @classmethod
+    def get_service_by_slug(cls, config: Config,
+                            owner_username: str, service_name: str) -> Dict:
+        conn, cur = cls.new_pg_conn(config)
+        query = f"""
+        select services.uuid from services
+        join owners on owner_uuid = owners.uuid
+        where owners.username = %s and services.name = %s
+        """
+        cur.execute(query, (owner_username, service_name))
+        return cur.fetchone()
+
+    @classmethod
+    def get_service_limits(cls, config: Config, service: str):
+        if '/' in service:
+            service = cls.get_service_by_slug(config, *service.split('/'))
+        else:
+            service = cls.get_service_by_alias(config, service)
+        conn, cur = cls.new_pg_conn(config)
+        query = f"""
+        select cpu_units, memory_bytes
+        from service_usage
+        where service_uuid = %s
+        """
+        cur.execute(query, (service['uuid'],))
+        res = cur.fetchone()
+        if res is None or len(res['cpu_units']) < cls.METRICS_SIZE:
+            return '0', '200Mi'
+        else:
+            return mean(res['cpu_units']), mean(res['memory_bytes'])

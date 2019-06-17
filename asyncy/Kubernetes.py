@@ -12,6 +12,7 @@ from tornado.httpclient import AsyncHTTPClient, HTTPResponse
 
 from . import AppConfig
 from .AppConfig import Expose
+from .Database import Database
 from .Exceptions import K8sError
 from .constants.ServiceConstants import ServiceConstants
 from .entities.ContainerConfig import ContainerConfig, ContainerConfigs
@@ -565,6 +566,9 @@ class Kubernetes:
 
         liveness_probe = cls.get_liveness_probe(app, service_name)
 
+        cpu_limit, memory_limit = Database.get_service_limits(app.config,
+                                                              service_name)
+
         payload = {
             'apiVersion': 'apps/v1',
             'kind': 'Deployment',
@@ -597,8 +601,8 @@ class Kubernetes:
                                 'image': image,
                                 'resources': {
                                     'limits': {
-                                        'memory': '200Mi',  # During beta.
-                                        # 'cpu': '500m',  # During beta.
+                                        'memory': memory_limit,
+                                        'cpu': cpu_limit
                                     }
                                 },
                                 'command': start_command,

@@ -9,6 +9,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from asyncy.AppConfig import AppConfig, Expose, KEY_EXPOSE
+from asyncy.Database import Database
 from asyncy.Exceptions import K8sError
 from asyncy.Kubernetes import Kubernetes
 from asyncy.constants.LineConstants import LineConstants
@@ -677,8 +678,8 @@ async def test_create_deployment(patch, async_mock, story):
                             'image': image,
                             'resources': {
                                 'limits': {
-                                    'memory': '200Mi'
-                                    # 'cpu': '500m'
+                                    'memory': '0',
+                                    'cpu': '0'
                                 }
                             },
                             'command': start_command,
@@ -734,6 +735,7 @@ async def test_create_deployment(patch, async_mock, story):
 
     patch.object(asyncio, 'sleep', new=async_mock())
     patch.object(Kubernetes, 'check_for_image_errors', new=async_mock())
+    patch.object(Database, 'get_service_limits', return_value=('0', '0'))
 
     expected_create_path = f'/apis/apps/v1/namespaces/' \
                            f'{story.app.app_id}/deployments'
