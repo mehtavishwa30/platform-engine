@@ -126,8 +126,9 @@ class Apps:
 
             app_config = cls.get_app_config(raw=stories.get('yaml', {}))
 
-            app = App(app_id, app_dns, version, config, logger, stories,
-                      services, always_pull_images, environment, owner_uuid, app_config)
+            app = App(app_id, app_dns, version, config, logger,
+                      stories, services, always_pull_images,
+                      environment, owner_uuid, app_config)
 
             await Containers.clean_app(app)
 
@@ -275,8 +276,9 @@ class Apps:
                             from releases
                             where state != 'NO_DEPLOY'::release_state
                             group by app_uuid)
-            select app_uuid, id, config, payload, always_pull_images, maintenance,
-                   hostname, state, deleted, apps.owner_uuid
+            select app_uuid, id, config, payload,
+                    always_pull_images, maintenance,
+                    hostname, state, deleted, apps.owner_uuid
             from latest
                    inner join releases using (app_uuid, id)
                    inner join apps on (latest.app_uuid = apps.uuid)
@@ -309,7 +311,8 @@ class Apps:
             await asyncio.wait_for(
                 cls.deploy_release(
                     config, app_id, app_dns, version,
-                    environment, stories, always_pull_images, maintenance, deleted, owner_uuid),
+                    environment, stories, always_pull_images,
+                    maintenance, deleted, owner_uuid),
                 timeout=5 * 60)
             glogger.info(f'Reloaded app {app_id}@{version}')
         except BaseException as e:

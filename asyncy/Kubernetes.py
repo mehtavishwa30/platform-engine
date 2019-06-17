@@ -491,7 +491,8 @@ class Kubernetes:
 
         b16_service_name = base64.b16encode(service_name.encode()).decode()
 
-        image_pull_policy = 'Always' if app.always_pull_images else 'IfNotPresent'
+        image_pull_policy = 'Always' if app.always_pull_images \
+            else 'IfNotPresent'
 
         app.logger.debug(f'imagePullPolicy set to {image_pull_policy}')
 

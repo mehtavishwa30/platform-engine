@@ -36,8 +36,9 @@ class App:
     """
 
     def __init__(self, app_id: str, app_dns: str, version: int, config: Config,
-                 logger: Logger, stories: dict, services: dict, always_pull_images: bool,
-                 environment: dict, owner_uuid: str, app_config: AppConfig):
+                 logger: Logger, stories: dict, services: dict,
+                 always_pull_images: bool, environment: dict,
+                 owner_uuid: str, app_config: AppConfig):
         self._subscriptions = {}
         self.app_id = app_id
         self.app_dns = app_dns
