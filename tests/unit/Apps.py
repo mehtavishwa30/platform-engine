@@ -201,8 +201,9 @@ async def test_reload_app(patch, config, logger, db, async_mock,
     else:
         patch.object(Apps, 'deploy_release', new=async_mock())
 
-    release = ['app_id', 'version', 'env', 'stories', False, 'maintenance', app_dns,
-               previous_state, False, 'owner_uuid']
+    release = ['app_id', 'version', 'env', 'stories', False, 'maintenance',
+               app_dns, previous_state,
+               False, 'owner_uuid']
     conn.cursor().fetchone.return_value = release
 
     await Apps.reload_app(config, logger, app_id)
@@ -217,7 +218,8 @@ async def test_reload_app(patch, config, logger, db, async_mock,
 
     Apps.deploy_release.mock.assert_called_with(
         config, app_id, app_dns,
-        release[1], release[2], release[3], release[4], release[5], release[8], release[9])
+        release[1], release[2], release[3], release[4],
+        release[5], release[8], release[9])
 
     if raise_exc:
         logger.error.assert_called()
@@ -358,7 +360,8 @@ async def test_deploy_release(config, magic, patch, deleted,
         App.__init__.assert_called_with(
             'app_id', 'app_dns', 'version', config,
             app_logger,
-            {'stories': True}, services, False, 'env', 'owner_uuid', app_config)
+            {'stories': True}, services, False,
+            'env', 'owner_uuid', app_config)
         App.bootstrap.mock.assert_called()
         Containers.init.mock.assert_called()
         if raise_exc is not None:

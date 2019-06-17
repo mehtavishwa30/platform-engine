@@ -144,7 +144,7 @@ def test_app_init(magic, config, logger, env):
     assert app.owner_uuid == 'owner_1'
     assert app.stories == stories['stories']
     assert app.services == services
-    assert app.always_pull_images == False
+    assert not app.always_pull_images
     assert app.environment == env
     assert app.app_context['hostname'] == f'{app.app_dns}.asyncyapp.com'
     assert app.app_context['version'] == version
