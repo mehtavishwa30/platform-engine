@@ -4,7 +4,9 @@ import json
 import urllib.parse
 from unittest import mock
 
+from asyncy.Database import Database
 from asyncy.Kubernetes import Kubernetes
+from asyncy.Service import Service
 from asyncy.ServiceUsage import ServiceUsage
 
 import pytest
@@ -85,7 +87,11 @@ def test_cpu_units(patch, value):
     'k8s_response': {
         'items': []
     },
-    'metrics': (None, None)
+    'metrics': {
+        'average_cpu': None,
+        'average_memory': None,
+        'num_pods': 0
+    }
 }, {
     'k8s_response': {
         'items': [{
@@ -102,7 +108,11 @@ def test_cpu_units(patch, value):
             }]
         }],
     },
-    'metrics': (pytest.approx(0.009), pytest.approx(30003200.0))
+    'metrics': {
+        'average_cpu': pytest.approx(0.009),
+        'average_memory': pytest.approx(30003200.0),
+        'num_pods': 2
+    }
 }])
 @mark.asyncio
 async def test_get_pod_metrics(patch, async_mock, app, value):
@@ -121,8 +131,7 @@ async def test_get_pod_metrics(patch, async_mock, app, value):
 
     ret = await ServiceUsage.get_pod_metrics(service, app.config, app.logger)
 
-    num_pods = len(value['k8s_response']['items'])
-    assert ret == (*value['metrics'], num_pods)
+    assert ret == value['metrics']
 
     expected_labels = ServiceUsage.get_service_labels(service)
     expected_qs = urllib.parse.urlencode({

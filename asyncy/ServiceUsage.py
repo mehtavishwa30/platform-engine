@@ -2,7 +2,7 @@ import asyncio
 import base64
 import json
 import urllib.parse
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Dict
 
 from .Config import Config
 from .Database import Database
@@ -20,7 +20,7 @@ class ServiceUsage:
         """
         A service in the DB can be identified by either of:
         - owner_username / service_name
-        - service_name
+        - service_alias
         """
         slug = f"{service['username']}/{service['name']}"
         alias = service['alias']
@@ -72,7 +72,7 @@ class ServiceUsage:
 
     @classmethod
     async def get_pod_metrics(cls, service, config: Config,
-                              logger: Logger) -> Tuple[float, float, int]:
+                              logger: Logger) -> Dict:
         """
         Get the average CPU units and memory bytes
         consumed by all the running pods of a service
@@ -107,7 +107,11 @@ class ServiceUsage:
             average_cpu = total_cpu / num_pods
             average_memory = total_memory / num_pods
 
-        return average_cpu, average_memory, num_pods
+        return {
+            'average_cpu': average_cpu,
+            'average_memory': average_memory,
+            'num_pods': num_pods
+        }
 
     @classmethod
     async def record_service_usage(cls, config: Config, logger: Logger):
@@ -115,16 +119,15 @@ class ServiceUsage:
             all_services = Database.get_all_services(config)
             for service in all_services:
                 # Get cpu, memory average for all running pods of the service
-                cpu_avg, memory_avg, num_pods = \
-                    await cls.get_pod_metrics(service, config, logger)
-                if num_pods == 0:
+                metrics = await cls.get_pod_metrics(service, config, logger)
+                if metrics['num_pods'] == 0:
                     # No running pods found, nothing to do here
                     continue
                 # Get stored metrics (past cpu, mem averages) of the service
                 usage = Database.get_service_usage(config, service)
                 # Add new set of entries to the usage arrays
-                usage['cpu_units'].append(cpu_avg)
-                usage['memory_bytes'].append(memory_avg)
+                usage['cpu_units'].append(metrics['average_cpu'])
+                usage['memory_bytes'].append(metrics['average_memory'])
                 Database.update_service_usage(config, service, usage)
             await asyncio.sleep(cls.WAIT_PERIOD)
 
