@@ -113,7 +113,7 @@ class Database:
         Returns { cpu_units: [...], memory_bytes: [...] }
         """
         conn, cur = cls.new_pg_conn(config)
-        query = f"""
+        query = """
         select cpu_units, memory_bytes
         from service_usage
         where service_uuid = %s;
@@ -121,7 +121,7 @@ class Database:
         cur.execute(query, (service['uuid'],))
         res = cur.fetchone()
         if res is None:
-            query = f"""
+            query = """
             insert into service_usage
             (service_uuid) values (%s)
             returning cpu_units, memory_bytes;
@@ -139,18 +139,19 @@ class Database:
         data.update((k, v[-cls.METRICS_SIZE:]) for k, v in data.items())
 
         conn, cur = cls.new_pg_conn(config)
-        query = f"""
+        query = """
         update service_usage
         set cpu_units = %s, memory_bytes = %s
         where service_uuid = %s;
         """
-        cur.execute(query, (*tuple(data.values()), service['uuid']))
+        cur.execute(query, (data['cpu_units'], data['memory_bytes'],
+                            service['uuid']))
         conn.commit()
 
     @classmethod
     def get_service_by_alias(cls, config: Config, service_alias) -> Dict:
         conn, cur = cls.new_pg_conn(config)
-        query = f"""
+        query = """
         select uuid from services where alias = %s
         """
         cur.execute(query, (service_alias,))
@@ -160,7 +161,7 @@ class Database:
     def get_service_by_slug(cls, config: Config,
                             owner_username: str, service_name: str) -> Dict:
         conn, cur = cls.new_pg_conn(config)
-        query = f"""
+        query = """
         select services.uuid from services
         join owners on owner_uuid = owners.uuid
         where owners.username = %s and services.name = %s
@@ -171,11 +172,13 @@ class Database:
     @classmethod
     def get_service_limits(cls, config: Config, service: str):
         if '/' in service:
-            service = cls.get_service_by_slug(config, *service.split('/'))
+            owner_username, service_name = service.split('/')
+            service = cls.get_service_by_slug(config,
+                                              owner_username, service_name)
         else:
             service = cls.get_service_by_alias(config, service)
         conn, cur = cls.new_pg_conn(config)
-        query = f"""
+        query = """
         select cpu_units, memory_bytes
         from service_usage
         where service_uuid = %s
