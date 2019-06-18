@@ -31,6 +31,8 @@ logger.adapt('engine', Version.version)
 
 class Service:
 
+    shutting_down = False
+
     @click.group()
     def main():
         pass
@@ -115,7 +117,7 @@ class Service:
     @classmethod
     def shutdown(cls):
         logger.info('Shutting down...')
-
+        cls.shutting_down = True
         server.stop()
         loop = asyncio.get_event_loop()
         loop.create_task(cls.shutdown_app())

@@ -84,6 +84,61 @@ def test_cpu_units(patch, value):
 
 
 @mark.parametrize('value', [{
+    'pod_metrics': {
+        'average_cpu': None,
+        'average_memory': None,
+        'num_pods': 0
+    },
+    'usage_db': {},
+    'final': {}
+}, {
+    'pod_metrics': {
+        'average_cpu': 0.05,
+        'average_memory': 12345,
+        'num_pods': 3
+    },
+    'usage_db': {
+        'cpu_units': [0.04],
+        'memory_bytes': [54321]
+    },
+    'final': {
+        'cpu_units': [0.04, 0.05],
+        'memory_bytes': [54321, 12345]
+    }
+}])
+@mark.asyncio
+async def test_record_service_usage(patch, async_mock, app, value):
+
+    Service.shutting_down = False
+
+    def side_effect(*args, **kwargs):
+        Service.shutting_down = True
+
+    usage_db = value['usage_db']
+    pod_metrics = value['pod_metrics']
+
+    patch.object(Database, 'get_all_services',
+                 return_value=[value])
+    patch.object(ServiceUsage, 'get_pod_metrics',
+                 new=async_mock(return_value=pod_metrics))
+    patch.object(Database, 'get_service_usage',
+                 return_value=usage_db)
+    patch.object(Database, 'update_service_usage')
+
+    patch.object(asyncio, 'sleep', new=async_mock(side_effect=side_effect))
+
+    await ServiceUsage.record_service_usage(app.config, app.logger)
+
+    if value['pod_metrics']['num_pods'] == 0:
+        Database.get_service_usage.assert_not_called()
+        Database.update_service_usage.assert_not_called()
+    else:
+        Database.get_service_usage.assert_called_with(app.config, value)
+        Database.update_service_usage.assert_called_with(app.config, value,
+                                                         value['final'])
+
+
+@mark.parametrize('value', [{
     'k8s_response': {
         'items': []
     },

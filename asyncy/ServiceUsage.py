@@ -115,7 +115,8 @@ class ServiceUsage:
 
     @classmethod
     async def record_service_usage(cls, config: Config, logger: Logger):
-        while True:
+        from .Service import Service
+        while not Service.shutting_down:
             all_services = Database.get_all_services(config)
             for service in all_services:
                 # Get cpu, memory average for all running pods of the service
