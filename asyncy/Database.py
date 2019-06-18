@@ -1,11 +1,11 @@
 from statistics import mean
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
 from .Config import Config
-from .entities.ContainerConfig import ContainerConfig
+from .entities.ContainerConfig import ContainerConfig, ContainerConfigs
 from .entities.Release import Release
 from .enums.ReleaseState import ReleaseState
 
@@ -20,7 +20,7 @@ class Database:
         return conn
 
     @classmethod
-    def get_all_app_uuids_for_deployment(cls, config: Config):
+    def get_all_app_uuids_for_deployment(cls, config: Config) -> List[Dict]:
         conn = cls.new_pg_conn(config)
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -46,7 +46,7 @@ class Database:
         glogger.info(f'Updated state for {app_id}@{version} to {state.name}')
 
     @classmethod
-    def get_container_configs(cls, app, registry_url):
+    def get_container_configs(cls, app, registry_url) -> ContainerConfigs:
         conn = cls.new_pg_conn(app.config)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         query = """
@@ -68,7 +68,7 @@ class Database:
         return result
 
     @classmethod
-    def get_release_for_deployment(cls, config, app_id):
+    def get_release_for_deployment(cls, config, app_id) -> Release:
         conn = cls.new_pg_conn(config)
         cur = conn.cursor(cursor_factory=RealDictCursor)
         query = """
@@ -96,7 +96,8 @@ class Database:
 
     @classmethod
     def get_all_services(cls, config: Config) -> List[Dict]:
-        conn, cur = cls.new_pg_conn(config)
+        conn = cls.new_pg_conn(config)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
         query = """
         select owners.username, services.uuid, services.name, services.alias
@@ -112,7 +113,8 @@ class Database:
         """
         Returns { cpu_units: [...], memory_bytes: [...] }
         """
-        conn, cur = cls.new_pg_conn(config)
+        conn = cls.new_pg_conn(config)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         query = """
         select cpu_units, memory_bytes
         from service_usage
@@ -138,7 +140,8 @@ class Database:
         # Store only the last ${METRICS_SIZE} metrics
         data.update((k, v[-cls.METRICS_SIZE:]) for k, v in data.items())
 
-        conn, cur = cls.new_pg_conn(config)
+        conn = cls.new_pg_conn(config)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         query = """
         update service_usage
         set cpu_units = %s, memory_bytes = %s
@@ -150,7 +153,8 @@ class Database:
 
     @classmethod
     def get_service_by_alias(cls, config: Config, service_alias) -> Dict:
-        conn, cur = cls.new_pg_conn(config)
+        conn = cls.new_pg_conn(config)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         query = """
         select uuid from services where alias = %s
         """
@@ -160,7 +164,8 @@ class Database:
     @classmethod
     def get_service_by_slug(cls, config: Config,
                             owner_username: str, service_name: str) -> Dict:
-        conn, cur = cls.new_pg_conn(config)
+        conn = cls.new_pg_conn(config)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         query = """
         select services.uuid from services
         join owners on owner_uuid = owners.uuid
@@ -170,14 +175,16 @@ class Database:
         return cur.fetchone()
 
     @classmethod
-    def get_service_limits(cls, config: Config, service: str):
+    def get_service_limits(cls, config: Config,
+                           service: str) -> Dict[str, Union[str, float]]:
         if '/' in service:
             owner_username, service_name = service.split('/')
             service = cls.get_service_by_slug(config,
                                               owner_username, service_name)
         else:
             service = cls.get_service_by_alias(config, service)
-        conn, cur = cls.new_pg_conn(config)
+        conn = cls.new_pg_conn(config)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         query = """
         select cpu_units, memory_bytes
         from service_usage
@@ -186,6 +193,13 @@ class Database:
         cur.execute(query, (service['uuid'],))
         res = cur.fetchone()
         if res is None or len(res['cpu_units']) < cls.METRICS_SIZE:
-            return '0', '200Mi'
+            limits = {
+                'cpu': '0',
+                'memory': '200Mi'
+            }
         else:
-            return mean(res['cpu_units']), mean(res['memory_bytes'])
+            limits = {
+                'cpu': mean(res['cpu_units']),
+                'memory': mean(res['memory_bytes'])
+            }
+        return limits
