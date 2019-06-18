@@ -2,7 +2,7 @@ import asyncio
 import base64
 import json
 import urllib.parse
-from typing import List, Tuple, Union, Dict
+from typing import Dict, List, Tuple, Union
 
 from .Config import Config
 from .Database import Database
