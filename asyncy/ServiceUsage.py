@@ -103,7 +103,7 @@ class ServiceUsage:
             total_memory += cls.memory_bytes(
                 pod['containers'][0]['usage']['memory'])
 
-        if num_pods != 0:
+        if num_pods > 0:
             average_cpu = total_cpu / num_pods
             average_memory = total_memory / num_pods
 
