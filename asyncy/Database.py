@@ -199,7 +199,7 @@ class Database:
             }
         else:
             limits = {
-                'cpu': mean(res['cpu_units']),
-                'memory': mean(res['memory_bytes'])
+                'cpu': 1.25 * mean(res['cpu_units']),
+                'memory': 1.25 * mean(res['memory_bytes'])
             }
         return limits
