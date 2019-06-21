@@ -5,10 +5,10 @@ import urllib.parse
 from typing import Dict, List, Tuple, Union
 
 from .Config import Config
-from .Database import Database
 from .Exceptions import K8sError
 from .Kubernetes import Kubernetes
 from .Logger import Logger
+from .db.Database import Database
 
 
 class ServiceUsage:

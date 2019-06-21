@@ -4,10 +4,10 @@ import json
 import urllib.parse
 from unittest import mock
 
-from asyncy.Database import Database
 from asyncy.Kubernetes import Kubernetes
 from asyncy.Service import Service
 from asyncy.ServiceUsage import ServiceUsage
+from asyncy.db.Database import Database
 
 import pytest
 from pytest import mark

@@ -12,9 +12,9 @@ from tornado.httpclient import AsyncHTTPClient, HTTPResponse
 
 from . import AppConfig
 from .AppConfig import Expose
-from .Database import Database
 from .Exceptions import K8sError
 from .constants.ServiceConstants import ServiceConstants
+from .db.Database import Database
 from .entities.ContainerConfig import ContainerConfig, ContainerConfigs
 from .entities.Volume import Volumes
 from .utils.Dict import Dict

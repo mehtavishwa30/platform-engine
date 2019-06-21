@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from statistics import mean
+
 from asyncy.Config import Config
 from asyncy.db.SimpleConnCursor import SimpleConnCursor
 from asyncy.entities.ContainerConfig import ContainerConfig
@@ -9,6 +11,8 @@ import psycopg2
 
 
 class Database:
+
+    METRICS_SIZE = 25
 
     @classmethod
     def new_pg_conn(cls, config: Config):
@@ -99,3 +103,105 @@ class Database:
                 owner_uuid=data['owner_uuid'],
                 owner_email=data['owner_email']
             )
+
+    @classmethod
+    def get_all_services(cls, config: Config):
+        with cls.new_pg_cur(config) as db:
+            query = """
+            select owners.username, services.uuid, services.name,
+                   services.alias
+            from services
+            join owners on owner_uuid = owners.uuid;
+            """
+            db.cur.execute(query)
+            return db.cur.fetchall()
+
+    @classmethod
+    def get_service_usage(cls, config: Config, service):
+        """
+        Returns { cpu_units: [...], memory_bytes: [...] }
+        """
+        with cls.new_pg_cur(config) as db:
+            query = """
+            select cpu_units, memory_bytes
+            from service_usage
+            where service_uuid = %s;
+            """
+            db.cur.execute(query, (service['uuid'],))
+            res = db.cur.fetchone()
+            if res is None:
+                query = """
+                insert into service_usage
+                (service_uuid) values (%s)
+                returning cpu_units, memory_bytes;
+                """
+                db.cur.execute(query, (service['uuid'],))
+                db.conn.commit()
+                res = db.cur.fetchone()
+            return res
+
+    @classmethod
+    def update_service_usage(cls, config: Config, service, data):
+
+        # Store only the last ${METRICS_SIZE} metrics
+        data.update((k, v[-cls.METRICS_SIZE:]) for k, v in data.items())
+
+        with cls.new_pg_cur(config) as db:
+            query = """
+            update service_usage
+            set cpu_units = %s, memory_bytes = %s
+            where service_uuid = %s;
+            """
+            db.cur.execute(query, (data['cpu_units'], data['memory_bytes'],
+                                   service['uuid']))
+            db.conn.commit()
+
+    @classmethod
+    def get_service_by_alias(cls, config: Config, service_alias: str):
+        with cls.new_pg_cur(config) as db:
+            query = """
+            select uuid from services where alias = %s
+            """
+            db.cur.execute(query, (service_alias,))
+            return db.cur.fetchone()
+
+    @classmethod
+    def get_service_by_slug(cls, config: Config,
+                            owner_username: str, service_name: str):
+        with cls.new_pg_cur(config) as db:
+            query = """
+            select services.uuid from services
+            join owners on owner_uuid = owners.uuid
+            where owners.username = %s and services.name = %s
+            """
+            db.cur.execute(query, (owner_username, service_name))
+            return db.cur.fetchone()
+
+    @classmethod
+    def get_service_limits(cls, config: Config, service: str):
+        if '/' in service:
+            owner_username, service_name = service.split('/')
+            service = cls.get_service_by_slug(config,
+                                              owner_username, service_name)
+        else:
+            service = cls.get_service_by_alias(config, service)
+
+        with cls.new_pg_cur(config) as db:
+            query = """
+            select cpu_units, memory_bytes
+            from service_usage
+            where service_uuid = %s
+            """
+            db.cur.execute(query, (service['uuid'],))
+            res = db.cur.fetchone()
+            if res is None or len(res['cpu_units']) < cls.METRICS_SIZE:
+                limits = {
+                    'cpu': '0',
+                    'memory': '200Mi'
+                }
+            else:
+                limits = {
+                    'cpu': 1.25 * mean(res['cpu_units']),
+                    'memory': 1.25 * mean(res['memory_bytes'])
+                }
+            return limits
