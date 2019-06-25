@@ -13,6 +13,7 @@ from asyncy.Exceptions import K8sError
 from asyncy.Kubernetes import Kubernetes
 from asyncy.constants.LineConstants import LineConstants
 from asyncy.constants.ServiceConstants import ServiceConstants
+from asyncy.entities.ContainerConfig import ContainerConfig
 from asyncy.entities.Volume import Volume
 from asyncy.utils.HttpUtils import HttpUtils
 
@@ -146,7 +147,8 @@ async def test_clean_namespace(patch, story, async_mock):
                  new=async_mock(side_effect=[['service_1', 'service_2'],
                                              ['depl_1', 'depl_2'],
                                              ['pod_1', 'pod_2'],
-                                             ['ing_1', 'ing_2']]))
+                                             ['ing_1', 'ing_2'],
+                                             ['secret_1', 'secret_2']]))
 
     patch.object(Kubernetes, '_delete_resource', new=async_mock())
 
@@ -160,7 +162,9 @@ async def test_clean_namespace(patch, story, async_mock):
         mock.call(story.app, 'pods', 'pod_1'),
         mock.call(story.app, 'pods', 'pod_2'),
         mock.call(story.app, 'ingresses', 'ing_1'),
-        mock.call(story.app, 'ingresses', 'ing_2')
+        mock.call(story.app, 'ingresses', 'ing_2'),
+        mock.call(story.app, 'secrets', 'secret_1'),
+        mock.call(story.app, 'secrets', 'secret_2')
     ]
 
 
@@ -180,7 +184,7 @@ def _create_response(code: int, body: dict = None):
 
 
 @mark.parametrize('first_res', [200, 409, 404])
-@mark.parametrize('resource', ['deployments', 'services',
+@mark.parametrize('resource', ['deployments', 'services', 'secrets',
                                'persistentvolumeclaims', 'unknown', 'pods'])
 @mark.asyncio
 async def test_delete_resource(patch, story, async_mock, first_res, resource):
@@ -352,7 +356,7 @@ async def test_create_pod(patch, async_mock, story, line, res_code):
 
     await Kubernetes.create_pod(
         story.app, line[LineConstants.service], image,
-        container_name, start_command, None, env, [])
+        container_name, start_command, None, env, [], [])
 
     Kubernetes.make_k8s_call.mock.assert_called_with(
         story.app.config, story.app.logger,
@@ -364,7 +368,7 @@ async def test_create_pod(patch, async_mock, story, line, res_code):
     else:
         Kubernetes.create_deployment.mock.assert_called_with(
             story.app, line[LineConstants.service],
-            image, container_name, start_command, None, env, [])
+            image, container_name, start_command, None, env, [], [])
         Kubernetes.create_service.mock.assert_called_with(
             story.app, line[LineConstants.service], container_name)
 
@@ -419,6 +423,45 @@ async def test_create_volume(story, patch, async_mock,
             story.app.config, story.app.logger,
             expected_path, expected_payload)
         Kubernetes.raise_if_not_2xx.assert_called_with(res)
+
+
+@mark.asyncio
+async def test_create_imagepullsecret(story, patch, async_mock):
+    res = MagicMock()
+    res.code = 200
+    patch.object(Kubernetes, 'make_k8s_call', new=async_mock(return_value=res))
+
+    container_config = ContainerConfig(name='first', data={
+        'auths': {
+            'https://index.docker.io/v1/': {
+                'auth': 'username_password_base64'
+            }
+        }
+    })
+
+    b64_container_config = base64.b64encode(
+        json.dumps(container_config.data).encode()
+    ).decode()
+
+    expected_path = f'/api/v1/namespaces/{story.app.app_id}/secrets'
+
+    expected_payload = {
+        'apiVersion': 'v1',
+        'kind': 'Secret',
+        'type': 'kubernetes.io/dockerconfigjson',
+        'metadata': {
+            'name': container_config.name,
+            'namespace': story.app.app_id
+        },
+        'data': {
+            '.dockerconfigjson': b64_container_config
+        }
+    }
+
+    await Kubernetes.create_imagepullsecret(story.app, container_config)
+
+    Kubernetes.make_k8s_call.mock.assert_called_with(
+        story.app.config, story.app.logger, expected_path, expected_payload)
 
 
 @mark.asyncio
@@ -566,8 +609,26 @@ async def test_create_deployment(patch, async_mock, story):
     volumes = [Volume(persist=False, name='tmp', mount_path='/tmp'),
                Volume(persist=True, name='db', mount_path='/db')]
 
+    container_configs = [
+        ContainerConfig(name='first', data={
+            'auths': {
+                'https://index.docker.io/v1/': {
+                    'auth': 'username_password_base64'
+                }
+            }
+        }),
+        ContainerConfig(name='second', data={
+            'auths': {
+                'https://index.docker.io/v1/': {
+                    'auth': 'new_username_password_base64'
+                }
+            }
+        })
+    ]
+
     patch.object(Kubernetes, 'remove_volume', new=async_mock())
     patch.object(Kubernetes, 'create_volume', new=async_mock())
+    patch.object(Kubernetes, 'create_imagepullsecret', new=async_mock())
 
     b16_service_name = base64.b16encode('alpine'.encode()).decode()
 
@@ -643,6 +704,14 @@ async def test_create_deployment(patch, async_mock, story):
                                 'claimName': volumes[1].name
                             }
                         }
+                    ],
+                    'imagePullSecrets': [
+                        {
+                            'name': container_configs[0].name
+                        },
+                        {
+                            'name': container_configs[1].name
+                        }
                     ]
                 }
             }
@@ -668,7 +737,7 @@ async def test_create_deployment(patch, async_mock, story):
     await Kubernetes.create_deployment(story.app, 'alpine', image,
                                        container_name,
                                        start_command, shutdown_command, env,
-                                       volumes)
+                                       volumes, container_configs)
 
     Kubernetes.remove_volume.mock.assert_called_once()
     Kubernetes.remove_volume.mock.assert_called_with(
@@ -677,6 +746,11 @@ async def test_create_deployment(patch, async_mock, story):
     assert Kubernetes.create_volume.mock.mock_calls == [
         mock.call(story.app, volumes[0].name, volumes[0].persist),
         mock.call(story.app, volumes[1].name, volumes[1].persist)
+    ]
+
+    assert Kubernetes.create_imagepullsecret.mock.mock_calls == [
+        mock.call(story.app, container_configs[0]),
+        mock.call(story.app, container_configs[1]),
     ]
 
     assert Kubernetes.make_k8s_call.mock.mock_calls == [

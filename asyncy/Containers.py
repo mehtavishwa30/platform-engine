@@ -11,6 +11,8 @@ from .Kubernetes import Kubernetes
 from .Types import StreamingService
 from .constants.LineConstants import LineConstants
 from .constants.ServiceConstants import ServiceConstants
+from .db.Database import Database
+from .entities.ContainerConfig import ContainerConfig
 from .entities.Volume import Volume
 from .utils import Dict
 
@@ -71,6 +73,12 @@ class Containers:
                 volumes.append(Volume(persist=persist, name=vol_name,
                                       mount_path=target))
 
+        registry_url = cls.get_registry_url(image)
+        container_configs = list(map(lambda config: ContainerConfig(
+            name=cls.get_containerconfig_name(app, config.name),
+            data=config.data
+        ), Database.get_container_configs(app, registry_url)))
+
         env = {}
         for key, omg_config in omg.get('environment', {}).items():
             actual_val = app.environment.get(service, {}).get(key)
@@ -87,7 +95,8 @@ class Containers:
                                     container_name=container_name,
                                     start_command=start_command,
                                     shutdown_command=shutdown_command, env=env,
-                                    volumes=volumes)
+                                    volumes=volumes,
+                                    container_configs=container_configs)
 
     @classmethod
     async def clean_app(cls, app):
@@ -118,6 +127,16 @@ class Containers:
         container = cls.get_container_name(story.app, story.name, line,
                                            service_alias)
         return Kubernetes.get_hostname(story.app, container)
+
+    @classmethod
+    def get_registry_url(cls, image):
+        official = ['docker.io', 'index.docker.io']
+        i = image.find('/')
+        if i == -1 or (not any(c in image[:i] for c in '.:') and
+                       image[:i] != 'localhost') or image[:i] in official:
+            return 'https://index.docker.io/v1/'
+        else:
+            return image[:i]
 
     @classmethod
     async def expose_service(cls, app, expose: Expose):
@@ -193,6 +212,12 @@ class Containers:
         return command_parts
 
     @classmethod
+    def get_containerconfig_name(cls, app, name):
+        simple_name = cls.get_simple_name(name)[:20]
+        h = cls.hash_containerconfig_name(app, name)
+        return f'{simple_name}-{h}'
+
+    @classmethod
     def get_container_name(cls, app, story_name, line, name):
         """
         If a container can be reused (where reuse is defined as a command
@@ -253,6 +278,11 @@ class Containers:
         simple_name = cls.get_simple_name(volume_name)[:20]
         h = hashlib.sha1(key.encode('utf-8')).hexdigest()
         return f'{simple_name}-{h}'
+
+    @classmethod
+    def hash_containerconfig_name(cls, app, name):
+        return hashlib.sha1(f'{app.version}-{name}'
+                            .encode('utf-8')).hexdigest()
 
     @classmethod
     async def exec(cls, logger, story, line, container_name, command):

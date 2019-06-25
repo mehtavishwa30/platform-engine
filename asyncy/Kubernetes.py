@@ -14,6 +14,7 @@ from . import AppConfig
 from .AppConfig import Expose
 from .Exceptions import K8sError
 from .constants.ServiceConstants import ServiceConstants
+from .entities.ContainerConfig import ContainerConfig, ContainerConfigs
 from .entities.Volume import Volumes
 from .utils.HttpUtils import HttpUtils
 
@@ -92,7 +93,8 @@ class Kubernetes:
                                       payload=payload)
 
         if not cls.is_2xx(res):
-            raise K8sError(f'Failed to create ingress for expose {expose}!')
+            raise K8sError(
+                message=f'Failed to create ingress for expose {expose}!')
 
         app.logger.debug(f'Kubernetes ingress created')
 
@@ -118,7 +120,7 @@ class Kubernetes:
                                       '/api/v1/namespaces', payload=payload)
 
         if not cls.is_2xx(res):
-            raise K8sError('Failed to create namespace!')
+            raise K8sError(message='Failed to create namespace!')
 
         app.logger.debug(f'Kubernetes namespace created')
 
@@ -239,7 +241,8 @@ class Kubernetes:
             return '/apis/extensions/v1beta1/namespaces'
         elif resource == 'services' or \
                 resource == 'persistentvolumeclaims' or \
-                resource == 'pods':
+                resource == 'pods' or \
+                resource == 'secrets':
             return '/api/v1/namespaces'
         else:
             raise Exception(f'Unsupported resource type {resource}')
@@ -319,6 +322,9 @@ class Kubernetes:
 
         for i in await cls._list_resource_names(app, 'ingresses'):
             await cls._delete_resource(app, 'ingresses', i)
+
+        for i in await cls._list_resource_names(app, 'secrets'):
+            await cls._delete_resource(app, 'secrets', i)
 
         # Volumes are not deleted at this moment.
         # See https://github.com/asyncy/platform-engine/issues/189
@@ -401,6 +407,33 @@ class Kubernetes:
                     f'Some actions of {service} might fail!')
 
     @classmethod
+    async def create_imagepullsecret(cls, app, config: ContainerConfig):
+
+        b64_container_config = base64.b64encode(
+            json.dumps(config.data).encode()
+        ).decode()
+
+        payload = {
+            'apiVersion': 'v1',
+            'kind': 'Secret',
+            'type': 'kubernetes.io/dockerconfigjson',
+            'metadata': {
+                'name': config.name,
+                'namespace': app.app_id
+            },
+            'data': {
+                '.dockerconfigjson': b64_container_config
+            }
+        }
+
+        path = f'/api/v1/namespaces/{app.app_id}/secrets'
+        res = await cls.make_k8s_call(app.config, app.logger, path, payload)
+        if not cls.is_2xx(res):
+            raise K8sError(
+                message=f'Failed to create imagePullSecret {config["name"]} '
+                        f'in namespace {app.app_id}!')
+
+    @classmethod
     async def wait_for_port(cls, host, port):
         attempts = 0
         timeout_secs = 2
@@ -448,7 +481,8 @@ class Kubernetes:
     async def create_deployment(cls, app, service_name: str, image: str,
                                 container_name: str, start_command: [] or str,
                                 shutdown_command: [] or str, env: dict,
-                                volumes: Volumes):
+                                volumes: Volumes,
+                                container_configs: ContainerConfigs):
         # Note: We don't check if this deployment exists because if it did,
         # then we'd not get here. create_pod checks it. During beta, we tie
         # 1:1 between a pod and a deployment.
@@ -488,6 +522,13 @@ class Kubernetes:
                 await cls.remove_volume(app, vol.name)
 
             await cls.create_volume(app, vol.name, vol.persist)
+
+        image_pull_secrets = []
+        for config in container_configs:
+            await cls.create_imagepullsecret(app, config)
+            image_pull_secrets.append({
+                'name': config.name
+            })
 
         b16_service_name = base64.b16encode(service_name.encode()).decode()
 
@@ -540,7 +581,8 @@ class Kubernetes:
                                 'volumeMounts': volume_mounts
                             }
                         ],
-                        'volumes': volumes_k8s
+                        'volumes': volumes_k8s,
+                        'imagePullSecrets': image_pull_secrets
                     }
                 }
             }
@@ -594,7 +636,8 @@ class Kubernetes:
     async def create_pod(cls, app, service: str, image: str,
                          container_name: str, start_command: [] or str,
                          shutdown_command: [] or str, env: dict,
-                         volumes: Volumes):
+                         volumes: Volumes,
+                         container_configs: ContainerConfigs):
         res = await cls.make_k8s_call(
             app.config, app.logger,
             f'/apis/apps/v1/namespaces/{app.app_id}'
@@ -607,6 +650,6 @@ class Kubernetes:
 
         await cls.create_deployment(app, service, image, container_name,
                                     start_command, shutdown_command, env,
-                                    volumes)
+                                    volumes, container_configs)
 
         await cls.create_service(app, service, container_name)

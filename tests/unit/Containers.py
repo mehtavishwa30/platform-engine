@@ -9,6 +9,8 @@ from asyncy.Exceptions import ActionNotFound, ContainerSpecNotRegisteredError,\
 from asyncy.Kubernetes import Kubernetes
 from asyncy.constants.LineConstants import LineConstants
 from asyncy.constants.ServiceConstants import ServiceConstants
+from asyncy.db.Database import Database
+from asyncy.entities.ContainerConfig import ContainerConfig
 from asyncy.entities.Volume import Volume
 from asyncy.processing import Story
 
@@ -61,6 +63,19 @@ def test_get_container_name(patch, story, line, reusable, name):
         assert ret == f'alpine-{h}'
 
 
+def test_get_containerconfig_name(app):
+    app.version = 'v1'
+    config = ContainerConfig(name='name_with_special_!!!_characters', data={
+        'auths': {
+            'registry_url': {
+                'auth': 'base64_string'
+            }
+        }
+    })
+    r = Containers.get_containerconfig_name(app, config.name)
+    assert r == 'namewithspecialchara-95b9733c79792f385564973c20be433f6f6832e9'
+
+
 @mark.asyncio
 async def test_exec():
     with pytest.raises(K8sError):
@@ -73,6 +88,24 @@ async def test_container_get_hostname(patch, story, line):
     patch.object(Containers, 'get_container_name', return_value='foo')
     ret = await Containers.get_hostname(story, line, 'foo')
     assert ret == 'foo.my_app.svc.cluster.local'
+
+
+@mark.parametrize('image', [
+    'postgres',
+    'library/postgres',
+    'docker.io/postgres',
+    'docker.io/library/postgres',
+    'index.docker.io/postgres',
+])
+def test_get_registry_url_official(image):
+    ret = Containers.get_registry_url(image)
+    assert ret == 'https://index.docker.io/v1/'
+
+
+def test_get_registry_url_custom():
+    image = 'cloud.canister.io:5000/repository/image'
+    ret = Containers.get_registry_url(image)
+    assert ret == 'cloud.canister.io:5000'
 
 
 @mark.asyncio
@@ -247,6 +280,9 @@ async def test_start(patch, story, async_mock,
     patch.object(Containers, 'get_container_name',
                  return_value='asyncy-alpine')
 
+    patch.object(Database, 'get_container_configs',
+                 return_value=[])
+
     expected_volumes = []
     if with_volumes:
         hash_db = Containers.hash_volume_name(story.app, line, 'alpine', 'db')
@@ -270,7 +306,8 @@ async def test_start(patch, story, async_mock,
         start_command=run_command or ['tail', '-f', '/dev/null'],
         shutdown_command=None,
         env={'alpine_only': True, 'param_1': 'hello_world'},
-        volumes=expected_volumes)
+        volumes=expected_volumes,
+        container_configs=[])
 
 
 @mark.asyncio
