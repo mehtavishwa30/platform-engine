@@ -176,6 +176,7 @@ async def test_reload_app_no_story(patch, config, logger, db, async_mock):
         environment={},
         stories=None,
         maintenance=False,
+        always_pull_images=False,
         app_dns='app_dns',
         state='QUEUED',
         deleted=True,
@@ -215,6 +216,7 @@ async def test_reload_app(patch, config, logger, db, async_mock,
         environment={},
         stories={},
         maintenance=False,
+        always_pull_images=False,
         app_dns=app_dns,
         state=previous_state,
         deleted=True,
@@ -235,7 +237,7 @@ async def test_reload_app(patch, config, logger, db, async_mock,
     Apps.deploy_release.mock.assert_called_with(
         config, app_id, app_dns,
         release.version, release.environment, release.stories,
-        release.maintenance, release.deleted, release.owner_uuid)
+        release.maintenance, release.always_pull_images, release.deleted, release.owner_uuid)
 
     if raise_exc:
         logger.error.assert_called()
@@ -260,7 +262,7 @@ async def test_deploy_release_many_services(patch):
         stories['services'][f'service_{i}'] = {}
 
     await Apps.deploy_release({}, 'app_id', 'app_dns', 'app_version', {},
-                              stories, False, False, 'owner_uuid')
+                              stories, False, False, False, 'owner_uuid')
 
     TooManyServices.__init__.assert_called_with(20, 15)
     Database.update_release_state.assert_called()
@@ -283,7 +285,7 @@ async def test_deploy_release_many_apps(patch, magic):
             stories['services'][f'service_{i}'] = {}
 
         await Apps.deploy_release({}, 'app_id', 'app_dns', 'app_version', {},
-                                  stories, False, False, 'owner_uuid')
+                                  stories, False, False, False, 'owner_uuid')
 
         TooManyActiveApps.__init__.assert_called_with(20, 5)
         Database.update_release_state.assert_called()
@@ -321,7 +323,7 @@ async def test_deploy_release_many_volumes(patch, async_mock):
                  new=async_mock(return_value=stories['services']))
 
     await Apps.deploy_release({}, 'app_id', 'app_dns', 'app_version', {},
-                              stories, False, False, 'owner_uuid')
+                              stories, False, False, False, 'owner_uuid')
 
     TooManyVolumes.__init__.assert_called_with(20, 15)
     Database.update_release_state.assert_called()
@@ -329,10 +331,11 @@ async def test_deploy_release_many_volumes(patch, async_mock):
 
 @mark.parametrize('raise_exc', [None, exc, asyncy_exc])
 @mark.parametrize('maintenance', [True, False])
+@mark.parametrize('always_pull_images', [True, False])
 @mark.parametrize('deleted', [True, False])
 @mark.asyncio
 async def test_deploy_release(config, magic, patch, deleted,
-                              async_mock, raise_exc, maintenance):
+                              async_mock, raise_exc, maintenance, always_pull_images):
     patch.object(Sentry, 'capture_exc')
     patch.object(Kubernetes, 'clean_namespace', new=async_mock())
     patch.object(Containers, 'init', new=async_mock())
@@ -354,7 +357,7 @@ async def test_deploy_release(config, magic, patch, deleted,
 
     await Apps.deploy_release(
         config, 'app_id', 'app_dns', 'version', 'env',
-        {'stories': True}, maintenance, deleted, 'owner_uuid')
+        {'stories': True}, maintenance, always_pull_images, deleted, 'owner_uuid')
 
     if maintenance:
         assert Database.update_release_state.call_count == 0
@@ -370,7 +373,7 @@ async def test_deploy_release(config, magic, patch, deleted,
         App.__init__.assert_called_with(
             'app_id', 'app_dns', 'version', config,
             app_logger,
-            {'stories': True}, services, 'env', 'owner_uuid', app_config)
+            {'stories': True}, services, always_pull_images, 'env', 'owner_uuid', app_config)
         App.bootstrap.mock.assert_called()
         Containers.init.mock.assert_called()
         if raise_exc is not None:

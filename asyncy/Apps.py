@@ -48,7 +48,8 @@ class Apps:
     @classmethod
     async def deploy_release(cls, config, app_id, app_dns,
                              version, environment, stories,
-                             maintenance: bool, deleted: bool, owner_uuid):
+                             maintenance: bool, always_pull_images: bool,
+                             deleted: bool, owner_uuid):
         logger = cls.make_logger_for_app(config, app_id, version)
         logger.info(f'Deploying app {app_id}@{version}')
 
@@ -98,7 +99,7 @@ class Apps:
             app_config = cls.get_app_config(raw=stories.get('yaml', {}))
 
             app = App(app_id, app_dns, version, config, logger,
-                      stories, services, environment, owner_uuid, app_config)
+                      stories, services, always_pull_images, environment, owner_uuid, app_config)
 
             await Containers.clean_app(app)
 
@@ -254,11 +255,14 @@ class Apps:
                              f'app {app_id}@{release.version}. '
                              f'Halting deployment.')
                 return
+
+            print(release)
+
             await asyncio.wait_for(
                 cls.deploy_release(
                     config, app_id, release.app_dns, release.version,
                     release.environment, release.stories,
-                    release.maintenance, release.deleted,
+                    release.maintenance, release.always_pull_images, release.deleted,
                     release.owner_uuid),
                 timeout=5 * 60)
             glogger.info(f'Reloaded app {app_id}@{release.version}')

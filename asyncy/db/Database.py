@@ -69,7 +69,7 @@ class Database:
                             group by app_uuid)
             select app_uuid, id as version, config environment,
                    payload stories,
-                   maintenance, hostname app_dns, state, deleted,
+                   maintenance, always_pull_images, hostname app_dns, state, deleted,
                    apps.owner_uuid
             from latest
                    inner join releases using (app_uuid, id)
@@ -83,6 +83,7 @@ class Database:
                            environment=data['environment'],
                            stories=data['stories'],
                            maintenance=data['maintenance'],
+                           always_pull_images=data['always_pull_images'],
                            app_dns=data['app_dns'],
                            state=data['state'], deleted=data['deleted'],
                            owner_uuid=data['owner_uuid'])
