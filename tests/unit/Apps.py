@@ -237,7 +237,8 @@ async def test_reload_app(patch, config, logger, db, async_mock,
     Apps.deploy_release.mock.assert_called_with(
         config, app_id, app_dns,
         release.version, release.environment, release.stories,
-        release.maintenance, release.always_pull_images, release.deleted, release.owner_uuid)
+        release.maintenance, release.always_pull_images,
+        release.deleted, release.owner_uuid)
 
     if raise_exc:
         logger.error.assert_called()
@@ -335,7 +336,8 @@ async def test_deploy_release_many_volumes(patch, async_mock):
 @mark.parametrize('deleted', [True, False])
 @mark.asyncio
 async def test_deploy_release(config, magic, patch, deleted,
-                              async_mock, raise_exc, maintenance, always_pull_images):
+                              async_mock, raise_exc, maintenance,
+                              always_pull_images):
     patch.object(Sentry, 'capture_exc')
     patch.object(Kubernetes, 'clean_namespace', new=async_mock())
     patch.object(Containers, 'init', new=async_mock())
@@ -357,7 +359,8 @@ async def test_deploy_release(config, magic, patch, deleted,
 
     await Apps.deploy_release(
         config, 'app_id', 'app_dns', 'version', 'env',
-        {'stories': True}, maintenance, always_pull_images, deleted, 'owner_uuid')
+        {'stories': True}, maintenance, always_pull_images,
+        deleted, 'owner_uuid')
 
     if maintenance:
         assert Database.update_release_state.call_count == 0
@@ -373,7 +376,8 @@ async def test_deploy_release(config, magic, patch, deleted,
         App.__init__.assert_called_with(
             'app_id', 'app_dns', 'version', config,
             app_logger,
-            {'stories': True}, services, always_pull_images, 'env', 'owner_uuid', app_config)
+            {'stories': True}, services, always_pull_images,
+            'env', 'owner_uuid', app_config)
         App.bootstrap.mock.assert_called()
         Containers.init.mock.assert_called()
         if raise_exc is not None:
