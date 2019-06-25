@@ -3,7 +3,7 @@ import re
 import sys
 from unittest.mock import MagicMock
 
-from asyncy.Exceptions import AsyncyError, \
+from asyncy.Exceptions import StoryscriptError, \
     TypeAssertionRuntimeError, TypeValueRuntimeError
 from asyncy.Stories import Stories
 from asyncy.processing import Story
@@ -650,7 +650,7 @@ async def run_test_case_in_suite(suite: TestSuite, case: TestCase, logger):
     story.prepare(context)
     try:
         await Story.execute(logger, story)
-    except AsyncyError as e:
+    except StoryscriptError as e:
         assert isinstance(case.assertion, RuntimeExceptionAssertion)
         case.assertion.verify(e)
         return

@@ -2,7 +2,7 @@
 from tornado.web import RequestHandler
 
 from ..Apps import Apps
-from ..Exceptions import AsyncyError
+from ..Exceptions import StoryscriptError
 from ..Sentry import Sentry
 
 
@@ -23,7 +23,7 @@ class BaseHandler(RequestHandler):
         logger.error(f'Story execution failed; cause={str(e)}', exc=e)
         self.set_status(500, 'Story execution failed')
         self.finish()
-        if isinstance(e, AsyncyError):
+        if isinstance(e, StoryscriptError):
             Sentry.capture_exc(e, e.story, e.line)
         else:
             if story_name is None:

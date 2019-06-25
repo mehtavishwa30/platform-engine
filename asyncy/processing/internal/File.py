@@ -3,7 +3,7 @@ import os
 import pathlib
 
 from .Decorators import Decorators
-from ...Exceptions import AsyncyError
+from ...Exceptions import StoryscriptError
 
 
 def safe_path(story, path):
@@ -34,8 +34,8 @@ async def file_write(story, line, resolved_args):
         with open(path, 'w') as f:
             f.write(resolved_args['content'])
     except IOError as e:
-        raise AsyncyError(message=f'Failed to write to file: {e}',
-                          story=story, line=line)
+        raise StoryscriptError(message=f'Failed to write to file: {e}',
+                               story=story, line=line)
 
 
 @Decorators.create_service(name='file', command='read', arguments={
@@ -47,8 +47,8 @@ async def file_read(story, line, resolved_args):
         with open(path, 'r') as f:
             return f.read()
     except IOError as e:
-        raise AsyncyError(message=f'Failed to read file: {e}',
-                          story=story, line=line)
+        raise StoryscriptError(message=f'Failed to read file: {e}',
+                               story=story, line=line)
 
 
 @Decorators.create_service(name='file', command='exists', arguments={

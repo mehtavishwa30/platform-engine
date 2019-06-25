@@ -4,7 +4,7 @@ import time
 from .Mutations import Mutations
 from .Services import Services
 from .. import Metrics
-from ..Exceptions import AsyncyError, AsyncyRuntimeError, InvalidKeywordUsage
+from ..Exceptions import StoryscriptError, StoryscriptRuntimeError, InvalidKeywordUsage
 from ..Stories import Stories
 from ..Types import StreamingService
 from ..constants.LineConstants import LineConstants
@@ -88,7 +88,7 @@ class Lexicon:
             result = await Story.execute_block(logger, story, function_line)
             if LineSentinels.is_sentinel(result):
                 if not isinstance(result, ReturnSentinel):
-                    raise AsyncyRuntimeError(f'Uncaught sentinel has '
+                    raise StoryscriptRuntimeError(f'Uncaught sentinel has '
                                              f'escaped! sentinel={result}')
 
                 return_from_function_call = result.return_value
@@ -144,7 +144,7 @@ class Lexicon:
                 value = Mutations.mutate(line['args'][1], value, story, line)
                 logger.debug(f'Mutation result: {value}')
             else:
-                raise AsyncyError(
+                raise StoryscriptError(
                     message=f'Unsupported argument in set: '
                             f'{line["args"][1]["$OBJECT"]}',
                     story=story, line=line)
@@ -156,9 +156,9 @@ class Lexicon:
     @staticmethod
     def _is_if_condition_true(story, line):
         if len(line['args']) != 1:
-            raise AsyncyError(message=f'Complex if condition found! '
+            raise StoryscriptError(message=f'Complex if condition found! '
                                       f'len={len(line["args"])}',
-                              story=story, line=line)
+                                   story=story, line=line)
 
         return story.resolve(line['args'][0], encode=False)
 
@@ -263,8 +263,8 @@ class Lexicon:
             next_line = story.next_block(line)
             return Lexicon.line_number_or_none(next_line)
         else:
-            raise AsyncyError(message=f'Unknown service {service} for when!',
-                              story=story, line=line)
+            raise StoryscriptError(message=f'Unknown service {service} for when!',
+                                   story=story, line=line)
 
     @classmethod
     async def ret(cls, logger, story: Stories, line):

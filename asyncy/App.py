@@ -10,7 +10,7 @@ from tornado.httpclient import AsyncHTTPClient
 from .AppConfig import AppConfig, Expose
 from .Config import Config
 from .Containers import Containers
-from .Exceptions import AsyncyError
+from .Exceptions import StoryscriptError
 from .Logger import Logger
 from .Stories import Stories
 from .Types import StreamingService
@@ -86,7 +86,7 @@ class App:
                          f'.{ServiceConstants.config}'
                          f'.expose.{e.service_expose_name}')
         if conf is None:
-            raise AsyncyError(
+            raise StoryscriptError(
                 message=f'Configuration for expose "{e.service_expose_name}" '
                 f'not found in service "{e.service}"')
 
@@ -94,7 +94,7 @@ class App:
         target_port = conf.get('http', {}).get('port')
 
         if target_path is None or target_port is None:
-            raise AsyncyError(
+            raise StoryscriptError(
                 message=f'http.path or http.port is null '
                 f'for expose {e.service}/{e.service_expose_name}')
 

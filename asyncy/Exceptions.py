@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-class AsyncyError(Exception):
+class StoryscriptError(Exception):
 
     def __init__(self, message=None, story=None, line=None):
         super().__init__(message)
@@ -10,36 +10,36 @@ class AsyncyError(Exception):
         self.line = line
 
 
-class AsyncyRuntimeError(AsyncyError):
+class StoryscriptRuntimeError(StoryscriptError):
     pass
 
 
-class TypeAssertionRuntimeError(AsyncyRuntimeError):
+class TypeAssertionRuntimeError(StoryscriptRuntimeError):
     def __init__(self, type_expected, type_received, value):
         super().__init__(message=f'Incompatible type assertion: '
                                  f'Received {value} ({type_received}), but '
                                  f'expected {type_expected}')
 
 
-class TypeValueRuntimeError(AsyncyRuntimeError):
+class TypeValueRuntimeError(StoryscriptRuntimeError):
     def __init__(self, type_expected, type_received, value):
         super().__init__(message=f'Type conversion failed from '
                                  f'{type_received} to '
                                  f'{type_expected} with `{value}`')
 
 
-class InvalidKeywordUsage(AsyncyError):
+class InvalidKeywordUsage(StoryscriptError):
     def __init__(self, story, line, keyword):
         super().__init__(message=f'Invalid usage of keyword "{keyword}".',
                          story=story, line=line)
 
 
-class ContainerSpecNotRegisteredError(AsyncyError):
+class ContainerSpecNotRegisteredError(StoryscriptError):
     def __init__(self, container_name):
         super().__init__(message=f'Service {container_name} not registered!')
 
 
-class TooManyVolumes(AsyncyError):
+class TooManyVolumes(StoryscriptError):
     def __init__(self, volume_count, max_volumes):
         super().__init__(
             message=f'Your app makes use of {volume_count} volumes. '
@@ -48,7 +48,7 @@ class TooManyVolumes(AsyncyError):
                     f'https://docs.storyscript.io/faq/ for more information.')
 
 
-class TooManyActiveApps(AsyncyError):
+class TooManyActiveApps(StoryscriptError):
     def __init__(self, active_apps, max_apps):
         super().__init__(
             message=f'Only {max_apps} active apps are allowed during '
@@ -57,7 +57,7 @@ class TooManyActiveApps(AsyncyError):
             'for more information.')
 
 
-class TooManyServices(AsyncyError):
+class TooManyServices(StoryscriptError):
     def __init__(self, service_count, max_services):
         super().__init__(
             message=f'Your app makes use of {service_count} services. '
@@ -66,7 +66,7 @@ class TooManyServices(AsyncyError):
                     f'https://docs.storyscript.io/faq/ for more information.')
 
 
-class ArgumentNotFoundError(AsyncyError):
+class ArgumentNotFoundError(StoryscriptError):
 
     def __init__(self, story=None, line=None, name=None):
         message = None
@@ -76,7 +76,7 @@ class ArgumentNotFoundError(AsyncyError):
         super().__init__(message, story=story, line=line)
 
 
-class ArgumentTypeMismatchError(AsyncyError):
+class ArgumentTypeMismatchError(StoryscriptError):
 
     def __init__(self, arg_name: str, omg_type: str, story=None, line=None):
         message = f'The argument "{arg_name}" does not match the expected ' \
@@ -84,7 +84,7 @@ class ArgumentTypeMismatchError(AsyncyError):
         super().__init__(message, story=story, line=line)
 
 
-class InvalidCommandError(AsyncyError):
+class InvalidCommandError(StoryscriptError):
 
     def __init__(self, name, story=None, line=None):
         message = None
@@ -94,13 +94,13 @@ class InvalidCommandError(AsyncyError):
         super().__init__(message, story=story, line=line)
 
 
-class K8sError(AsyncyError):
+class K8sError(StoryscriptError):
 
     def __init__(self, story=None, line=None, message=None):
         super().__init__(message, story=story, line=line)
 
 
-class ServiceNotFound(AsyncyError):
+class ServiceNotFound(StoryscriptError):
 
     def __init__(self, story=None, line=None, name=None):
         assert name is not None
@@ -111,7 +111,7 @@ class ServiceNotFound(AsyncyError):
             story=story, line=line)
 
 
-class ActionNotFound(AsyncyError):
+class ActionNotFound(StoryscriptError):
 
     def __init__(self, story=None, line=None, service=None, action=None):
         super().__init__(
@@ -121,7 +121,7 @@ class ActionNotFound(AsyncyError):
             story=story, line=line)
 
 
-class EnvironmentVariableNotFound(AsyncyError):
+class EnvironmentVariableNotFound(StoryscriptError):
     def __init__(self, service=None, variable=None, story=None, line=None):
         assert service is not None
         assert variable is not None

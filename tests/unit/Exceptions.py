@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-from asyncy.Exceptions import AsyncyError, TooManyActiveApps, \
+from asyncy.Exceptions import StoryscriptError, TooManyActiveApps, \
     TooManyServices, TooManyVolumes
 
 from pytest import raises
 
 
 def test_asyncy_error():
-    with raises(AsyncyError):
-        raise AsyncyError('things happen')
+    with raises(StoryscriptError):
+        raise StoryscriptError('things happen')
 
 
 def test_many_volumes():

@@ -5,7 +5,7 @@ from unittest import mock
 
 from asyncy import Metrics
 from asyncy.Containers import Containers
-from asyncy.Exceptions import AsyncyError, AsyncyRuntimeError
+from asyncy.Exceptions import StoryscriptError, StoryscriptRuntimeError
 from asyncy.Stories import Stories
 from asyncy.constants import ContextConstants
 from asyncy.constants.LineSentinels import LineSentinels
@@ -45,14 +45,14 @@ async def test_story_execute_escaping_sentinel(patch, app, logger,
         return_value=LineSentinels.RETURN))
     patch.object(Stories, 'first_line')
     story.prepare()
-    with pytest.raises(AsyncyRuntimeError):
+    with pytest.raises(StoryscriptRuntimeError):
         await Story.execute(logger, story)
 
 
 @mark.asyncio
 async def test_story_execute_line_unknown_method(logger, story):
     story.tree['1']['method'] = 'foo_method'
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await Story.execute_line(logger, story, '1')
 
 
@@ -232,7 +232,7 @@ async def test_story_run_with_id(patch, app, logger, async_mock):
 async def test_story_run_prepare_function(patch, app, logger, async_mock):
     patch.object(Story, 'story')
     function_name = 'function_name'
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await Story.run(app, logger, 'story_name',
                         context='context', function_name=function_name)
 
@@ -265,9 +265,9 @@ async def test_story_run_prepare(patch, app, logger, async_mock):
 @mark.asyncio
 async def test_story_execute_does_not_wrap(patch, story, async_mock):
     def exc(*args):
-        raise AsyncyError()
+        raise StoryscriptError()
 
     patch.object(Lexicon, 'execute', new=async_mock(side_effect=exc))
     patch.object(story, 'line', return_value={'method': 'execute'})
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await Story.execute_line(story.logger, story, '10')

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from unittest.mock import MagicMock
 
-from asyncy.Exceptions import AsyncyError
+from asyncy.Exceptions import StoryscriptError
 from asyncy.Sentry import Sentry
 from asyncy.http_handlers.BaseHandler import BaseHandler
 
@@ -25,7 +25,7 @@ def test_finished(magic, logger):
     assert handler.is_not_finished() is False
 
 
-@mark.parametrize('exception', [AsyncyError(story=MagicMock(), line={'ln': 1}),
+@mark.parametrize('exception', [StoryscriptError(story=MagicMock(), line={'ln': 1}),
                                 Exception()])
 @mark.parametrize('story_name', [None, 'super_story'])
 def test_handle_story_exc(patch, magic, logger, exception, story_name):
@@ -36,7 +36,7 @@ def test_handle_story_exc(patch, magic, logger, exception, story_name):
     handler.set_status.assert_called_with(500, 'Story execution failed')
     handler.finish.assert_called()
     logger.error.assert_called()
-    if isinstance(exception, AsyncyError):
+    if isinstance(exception, StoryscriptError):
         Sentry.capture_exc.assert_called_with(
             exception, exception.story, exception.line)
     elif story_name is not None:

@@ -10,7 +10,7 @@ from asyncy.App import App
 from asyncy.AppConfig import AppConfig
 from asyncy.Apps import Apps
 from asyncy.Containers import Containers
-from asyncy.Exceptions import AsyncyError, TooManyActiveApps, \
+from asyncy.Exceptions import StoryscriptError, TooManyActiveApps, \
     TooManyServices, TooManyVolumes
 from asyncy.GraphQLAPI import GraphQLAPI
 from asyncy.Kubernetes import Kubernetes
@@ -43,7 +43,7 @@ def asyncio_timeout_exc():
 
 def asyncy_exc():
     def foo(*args, **kwargs):
-        raise AsyncyError()
+        raise StoryscriptError()
 
     return foo
 

@@ -12,7 +12,7 @@ from tornado.httpclient import AsyncHTTPClient
 import ujson
 
 from ..Containers import Containers
-from ..Exceptions import ArgumentTypeMismatchError, AsyncyError
+from ..Exceptions import ArgumentTypeMismatchError, StoryscriptError
 from ..Logger import Logger
 from ..Types import StreamingService
 from ..constants.ContextConstants import ContextConstants
@@ -111,9 +111,9 @@ class Services:
             else:
                 return await cls.execute_http(story, line, chain, command_conf)
         else:
-            raise AsyncyError(message=f'Service {service}/{line["command"]} '
+            raise StoryscriptError(message=f'Service {service}/{line["command"]} '
                               f'has neither http nor format sections!',
-                              story=story, line=line)
+                                   story=story, line=line)
 
     @classmethod
     def resolve_chain(cls, story, line):
@@ -204,9 +204,9 @@ class Services:
         io_loop = story.context[ContextConstants.server_io_loop]
 
         if req.is_finished():
-            raise AsyncyError(message='No more actions can be executed for '
+            raise StoryscriptError(message='No more actions can be executed for '
                                       'this service as it\'s already closed.',
-                              story=story, line=line)
+                                   story=story, line=line)
 
         # BEGIN hack for writing a binary response to the gateway
         # How we write binary response to the gateway right now:
@@ -386,16 +386,16 @@ class Services:
                     body[arg] = FormField(arg, value)
                 form_fields_count += 1
             else:
-                raise AsyncyError(f'Invalid location for argument "{arg}" '
+                raise StoryscriptError(f'Invalid location for argument "{arg}" '
                                   f'specified: {location}',
-                                  story=story, line=line)
+                                       story=story, line=line)
 
         if form_fields_count > 0 and request_body_fields_count > 0:
-            raise AsyncyError(f'Mixed locations are not permitted. '
+            raise StoryscriptError(f'Mixed locations are not permitted. '
                               f'Found {request_body_fields_count} fields, '
                               f'of which '
                               f'{form_fields_count} were in the form body',
-                              story=story, line=line)
+                                   story=story, line=line)
 
         method = command_conf['http'].get('method', 'post')
         kwargs = {
@@ -408,7 +408,7 @@ class Services:
         if method.lower() == 'post':
             cls._fill_http_req_body(kwargs, content_type, body)
         elif len(body) > 0:
-            raise AsyncyError(
+            raise StoryscriptError(
                 message=f'Parameters found in the request body, '
                         f'but the method is {method}', story=story, line=line)
 
@@ -433,10 +433,10 @@ class Services:
                                         story, line, content_type)
         else:
             response_body = HttpUtils.read_response_body_quietly(response)
-            raise AsyncyError(message=f'Failed to invoke service! '
+            raise StoryscriptError(message=f'Failed to invoke service! '
                               f'Status code: {response.code}; '
                               f'response body: {response_body}',
-                              story=story, line=line)
+                                   story=story, line=line)
 
     @classmethod
     def parse_output(cls, command_conf: dict, raw_output, story,
@@ -460,7 +460,7 @@ class Services:
             raise Exception(f'Unsupported type {t}')
         except BaseException:
             truncated_output = StringUtils.truncate(raw_output, 160)
-            raise AsyncyError(
+            raise StoryscriptError(
                 message=f'Failed to parse output as type {t}. '
                         f'Content-Type received: "{content_type}". '
                         f'Output received {truncated_output}.',
@@ -571,7 +571,7 @@ class Services:
             story.logger.debug(f'Subscribed!')
             story.app.add_subscription(sub_id, s, command, body)
         else:
-            raise AsyncyError(
+            raise StoryscriptError(
                 message=f'Failed to subscribe to {service} from '
                         f'{s.command} in {s.container_name}! '
                         f'http err={response.error}; code={response.code}',
