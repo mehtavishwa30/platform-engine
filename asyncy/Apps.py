@@ -16,7 +16,7 @@ from .Exceptions import StoryscriptError, TooManyActiveApps, TooManyServices, \
     TooManyVolumes
 from .GraphQLAPI import GraphQLAPI
 from .Logger import Logger
-from .Sentry import Sentry
+from .reporting.Reporter import ExceptionReporter
 from .constants.ServiceConstants import ServiceConstants
 from .db.Database import Database
 from .enums.ReleaseState import ReleaseState
@@ -117,7 +117,7 @@ class Apps:
                 logger.error(str(e))
             else:
                 logger.error(f'Failed to bootstrap app ({e})', exc=e)
-                Sentry.capture_exc(e)
+                ExceptionReporter.capture_exc(e)
 
     @classmethod
     def make_logger_for_app(cls, config, app_id, version):
@@ -142,9 +142,16 @@ class Apps:
             ])
 
     @classmethod
-    async def init_all(cls, sentry_dsn: str, release: str,
+    async def init_all(cls, release: str,
                        config: Config, glogger: Logger):
-        Sentry.init(sentry_dsn, release)
+        ExceptionReporter.init({
+            "sentry_dsn": config.REPORTING_SENTRY_DSN,
+            "slack_webhook": config.REPORTING_SLACK_WEBHOOK,
+            "clevertap_config": {
+                "account": config.REPORTING_CLEVERTAP_ACCOUNT,
+                "pass": config.REPORTING_CLEVERTAP_PASS
+            }
+        }, release, glogger)
 
         # We must start listening for releases straight away,
         # before an app is even deployed.
@@ -265,7 +272,7 @@ class Apps:
         except BaseException as e:
             glogger.error(
                 f'Failed to reload app {app_id}', exc=e)
-            Sentry.capture_exc(e)
+            ExceptionReporter.capture_exc(e)
             if isinstance(e, asyncio.TimeoutError):
                 logger = cls.make_logger_for_app(config, app_id,
                                                  release.version)
@@ -284,7 +291,7 @@ class Apps:
             try:
                 await cls.destroy_app(app)
             except BaseException as e:
-                Sentry.capture_exc(e)
+                ExceptionReporter.capture_exc(e)
 
     @classmethod
     def listen_to_releases(cls, config: Config, glogger: Logger, loop):

@@ -85,8 +85,8 @@ class Story:
                 raise e
 
             logger.error(f'Unhandled story execution error: {str(e)}', e)
-            raise StoryscriptError(message='Failed to execute line',
-                                   story=story, line=line)
+            raise StoryscriptError(message=f'Failed to execute line',
+                                   story=story, line=line, root_exc=e)
 
     @staticmethod
     async def execute_block(logger, story, parent_line: dict):

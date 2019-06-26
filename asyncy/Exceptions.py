@@ -3,11 +3,12 @@
 
 class StoryscriptError(Exception):
 
-    def __init__(self, message=None, story=None, line=None):
+    def __init__(self, message=None, story=None, line=None, root_exc=None):
         super().__init__(message)
         self.message = message
         self.story = story
         self.line = line
+        self.root_exc = root_exc
 
 
 class StoryscriptRuntimeError(StoryscriptError):

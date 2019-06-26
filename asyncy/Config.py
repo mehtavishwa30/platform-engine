@@ -19,7 +19,11 @@ class Config:
         'ENGINE_HOST': socket.gethostname(),
         'CLUSTER_CERT': '',
         'CLUSTER_AUTH_TOKEN': '',
-        'CLUSTER_HOST': 'kubernetes.default.svc'
+        'CLUSTER_HOST': 'kubernetes.default.svc',
+        'REPORTING_SENTRY_DSN': None,
+        'REPORTING_SLACK_WEBHOOK': None,
+        'REPORTING_CLEVERTAP_ACCOUNT': None,
+        'REPORTING_CLEVERTAP_PASS': None
     }
 
     ENGINE_PORT = None
