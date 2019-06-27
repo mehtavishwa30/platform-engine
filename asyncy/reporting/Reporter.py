@@ -31,6 +31,8 @@ class ExceptionReporter:
         cls._release = release
         cls._logger = logger
 
+        # we don't check if the value is none, because users will still
+        # be able to provide their own app webhook for reporting
         if 'slack_webhook' in config:
             cls._slack_agent = SlackAgent(webhook=config['slack_webhook'],
                                           release=release, logger=logger)
@@ -51,8 +53,11 @@ class ExceptionReporter:
 
 
     @classmethod
-    def init_app_agents(cls, app_uuid: str, config: dict, logger: Logger):
-        # todo - finish this up
+    def init_app_agents(cls, app_uuid: str, config: dict):
+        # slack is currently the only supported user agent
+        cls._app_agents[app_uuid] = {
+            "slack_webhook": config.get("slack_webhook", None)
+        }
         return
 
     @classmethod
@@ -96,7 +101,7 @@ class ExceptionReporter:
         logger = cls._logger
 
         default_agent_options = {
-            'full_traceback': True
+            'full_stacktrace': True
         }
 
         if agent_options is not None:
@@ -117,7 +122,7 @@ class ExceptionReporter:
                 del agent_options['app_uuid']
 
             if 'app_version' in agent_options:
-                story_line = agent_options['app_version']
+                app_version = agent_options['app_version']
                 del agent_options['app_version']
 
             default_agent_options.update(agent_options)
@@ -151,11 +156,28 @@ class ExceptionReporter:
             except Exception as e:
                 logger.error(f'Unhandled CleverTap reporting agent error: {str(e)}', e)
 
-        # todo call application agents. this is currently un-implemented, users will be able
-        # to define their own agent configurations and report on their own end
-        # if app_uuid is not None and app_uuid in cls._app_agents:
-        #    app_agent = cls._app_agents[app_uuid]
-        #    if type(app_agent) is ReportingAgent:
-        #        app_agent.publish_exc(exc_info, exc_data)
-        #    elif type(app_agent) is dict:
-        #        return
+        # this is disabled at the top level
+        if cls._config.get('user_report', False) is False:
+            return
+
+        # ensure that this exception should be pushed to users
+        if default_agent_options.get('allow_user_agents', False):
+            if app_uuid is not None and app_uuid in cls._app_agents:
+                app_agent_config = cls._app_agents[app_uuid]
+                if cls._slack_agent is not None and 'slack_webhook' in app_agent_config:
+                    try:
+                        user_agent_options=default_agent_options.copy()
+                        user_agent_options['webhook'] = app_agent_config['slack_webhook']
+                        if cls._config.get('user_reporting_stacktrace', False) is False:
+                            user_agent_options['full_stacktrace'] = False
+                            user_agent_options['no_stacktrace'] = True
+                        else:
+                            user_agent_options['full_stacktrace'] = True
+
+                        await cls._slack_agent.publish_exc(exc_info=exc_info,
+                                                   exc_data=exc_data, agent_options=user_agent_options)
+                    except Exception as e:
+                        logger.error(f'Unhandled slack reporting agent error: {str(e)}', e)
+
+
+

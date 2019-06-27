@@ -30,7 +30,7 @@ class CleverTapAgent(ReportingAgent):
 
         _root_traceback = None
         if agent_options is not None:
-            if agent_options.get('full_traceback', False) and type(
+            if agent_options.get('full_stacktrace', False) and type(
                     exc_info) is StoryscriptError and exc_info.root_exc is not None:
                 _root_traceback = self.cleanup_traceback \
                     (''.join(traceback.format_tb(exc_info.root_exc.__traceback__)))

@@ -31,7 +31,8 @@ class BaseHandler(RequestHandler):
             'app_name': app.app_name,
             'app_version': app.version,
             'clever_ident': app.owner_email,
-            'clever_event': 'App Request Failure'
+            'clever_event': 'App Request Failure',
+            'allow_user_agents': True
         }
 
         if isinstance(e, StoryscriptError):

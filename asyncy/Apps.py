@@ -68,6 +68,14 @@ class Apps:
         Database.update_release_state(logger, config, app_id, version,
                                       ReleaseState.DEPLOYING)
 
+        if environment is not None and config.USER_REPORTING_ENABLED is not False:
+            # allow user based reporting in the engine. This makes it
+            # possible for users to retrieve deploy errors
+            if "REPORTING_SLACK_WEBHOOK" in environment:
+                ExceptionReporter.init_app_agents(app_id, {
+                    "slack_webhook": environment["REPORTING_SLACK_WEBHOOK"]
+                })
+
         try:
             # Check for the currently active apps by the same owner.
             # Note: This is a super inefficient method, but is OK
@@ -121,7 +129,8 @@ class Apps:
                     'app_uuid': app_id,
                     'app_version': version,
                     'clever_ident': owner_email,
-                    'clever_event': 'App Deploy Failed'
+                    'clever_event': 'App Deploy Failed',
+                    'allow_user_agents': True
                 })
             else:
                 logger.error(f'Failed to bootstrap app ({e})', exc=e)
@@ -130,7 +139,8 @@ class Apps:
                     'app_uuid': app_id,
                     'app_version': version,
                     'clever_ident': owner_email,
-                    'clever_event': 'App Deploy Failed'
+                    'clever_event': 'App Deploy Failed',
+                    'allow_user_agents': True
                 })
 
     @classmethod
@@ -166,7 +176,9 @@ class Apps:
             "clevertap_config": {
                 "account": config.REPORTING_CLEVERTAP_ACCOUNT,
                 "pass": config.REPORTING_CLEVERTAP_PASS
-            }
+            },
+            'user_reporting': config.USER_REPORTING_ENABLED,
+            'user_reporting_stacktrace': config.USER_REPORTING_STACKTRACE
         }, release, glogger)
 
         # We must start listening for releases straight away,

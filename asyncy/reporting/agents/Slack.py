@@ -48,8 +48,9 @@ class SlackAgent(ReportingAgent):
 
         # we need to pull the top level exception for reporting if requested by the reporter
         _root_traceback = None
+        _full_stacktrace = True
         if agent_options is not None:
-            if agent_options.get("full_traceback", False) and type(
+            if agent_options.get("full_stacktrace", False) and type(
                     exc_info) is StoryscriptError and exc_info.root_exc is not None:
                 _root_traceback = self.cleanup_traceback \
                     (''.join(traceback.format_tb(exc_info.root_exc.__traceback__)))
@@ -59,6 +60,14 @@ class SlackAgent(ReportingAgent):
             traceback_line = f"```{root_err_str}\n\nRoot Traceback:\n{_root_traceback}\n{err_str}\n\nTraceback:\n{_traceback}```"
         else:
             traceback_line = f"```{err_str}\n\nTraceback:\n{_traceback}```"
+
+        if agent_options is not None and agent_options.get('no_stacktrace', False):
+            # generally we won't be reporting the full error message without a full stacktrace
+            if _full_stacktrace and type(
+                    exc_info) is StoryscriptError and exc_info.root_exc is not None:
+                traceback_line = f'*Error*: {exc_info}: {exc_info.root_exc}'
+            else:
+                traceback_line = f'*Error*: {exc_info}'
 
         err_msg = f"An exception occurred with the following information:\n\n" \
             f"*Platform Engine Release*: {self._release}\n" \
@@ -71,10 +80,12 @@ class SlackAgent(ReportingAgent):
 
         webhook = self._webhook
 
-        # allow the webhook to be overridden easily for app based reporting
+        # allow the webhook to be overridden for user based reporting
         if agent_options is not None and \
                 "webhook" in agent_options:
             webhook = agent_options["webhook"]
+        elif webhook is None:
+            return
 
         await HttpUtils.fetch_with_retry(tries=3, logger=self._logger, url=webhook, http_client=self._http_client,
                                          kwargs={

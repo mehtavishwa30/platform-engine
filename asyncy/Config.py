@@ -23,7 +23,9 @@ class Config:
         'REPORTING_SENTRY_DSN': None,
         'REPORTING_SLACK_WEBHOOK': None,
         'REPORTING_CLEVERTAP_ACCOUNT': None,
-        'REPORTING_CLEVERTAP_PASS': None
+        'REPORTING_CLEVERTAP_PASS': None,
+        'USER_REPORTING_ENABLED': False,
+        'USER_REPORTING_STACKTRACE': False
     }
 
     ENGINE_PORT = None
