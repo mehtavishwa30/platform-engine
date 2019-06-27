@@ -7,7 +7,6 @@ from ..reporting.Reporter import ExceptionReporter
 
 
 class BaseHandler(RequestHandler):
-
     logger = None
 
     # noinspection PyMethodOverriding
@@ -27,11 +26,13 @@ class BaseHandler(RequestHandler):
         app = Apps.get(app_id)
 
         if isinstance(e, StoryscriptError):
-            ExceptionReporter.capture_exc(exc_info=e, story=e.story, line=e.line, agent_options={
-                'clever_ident': app.owner_email,
-                'clever_event': 'App Request Failure',
-                'allow_user_agents': True
-            })
+            ExceptionReporter.capture_exc(
+                exc_info=e, story=e.story,
+                line=e.line, agent_options={
+                    'clever_ident': app.owner_email,
+                    'clever_event': 'App Request Failure',
+                    'allow_user_agents': True
+                })
         else:
             agent_options = {
                 'app_uuid': app_id,
@@ -43,10 +44,12 @@ class BaseHandler(RequestHandler):
             }
 
             if story_name is None:
-                ExceptionReporter.capture_exc(exc_info=e, agent_options=agent_options)
+                ExceptionReporter.capture_exc(
+                    exc_info=e, agent_options=agent_options)
             else:
-                agent_options["story_name"] = story_name
-                ExceptionReporter.capture_exc(exc_info=e, agent_options=agent_options)
+                agent_options['story_name'] = story_name
+                ExceptionReporter.capture_exc(
+                    exc_info=e, agent_options=agent_options)
 
     def is_finished(self):
         return self._finished

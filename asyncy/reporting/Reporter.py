@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
 import asyncio
-from asyncio import Future
 
-from .Agent import ReportingAgent
+from .agents.CleverTap import CleverTapAgent
+from .agents.Sentry import SentryAgent
+from .agents.Slack import SlackAgent
 from .. import Logger
 from ..Exceptions import StoryscriptError
 from ..Stories import Stories
-from .agents.Sentry import SentryAgent
-from .agents.Slack import SlackAgent
-from .agents.CleverTap import CleverTapAgent
 
 
 class ExceptionReporter:
@@ -35,29 +33,34 @@ class ExceptionReporter:
         # we don't check if the value is none, because users will still
         # be able to provide their own app webhook for reporting
         if 'slack_webhook' in config:
-            cls._slack_agent = SlackAgent(webhook=config['slack_webhook'],
-                                          release=release, logger=logger)
+            cls._slack_agent = SlackAgent(
+                webhook=config['slack_webhook'],
+                release=release,
+                logger=logger)
 
         if 'sentry_dsn' in config:
-            cls._sentry_agent = SentryAgent(dsn=config['sentry_dsn'],
-                                            release=release, logger=logger)
+            cls._sentry_agent = SentryAgent(
+                dsn=config['sentry_dsn'],
+                release=release,
+                logger=logger)
 
         clever_config = config.get('clevertap_config', {
             'account': None,
             'pass': None
         })
 
-        if clever_config['account'] is not None and clever_config['pass'] is not None:
-            cls._clever_agent = CleverTapAgent(account_id=clever_config['account'],
-                                               account_pass=clever_config['pass'],
-                                               release=release, logger=logger)
-
+        if clever_config['account'] is not None and \
+                clever_config['pass'] is not None:
+            cls._clever_agent = CleverTapAgent(
+                account_id=clever_config['account'],
+                account_pass=clever_config['pass'],
+                release=release, logger=logger)
 
     @classmethod
     def init_app_agents(cls, app_uuid: str, config: dict):
         # slack is currently the only supported user agent
         cls._app_agents[app_uuid] = {
-            "slack_webhook": config.get("slack_webhook", None)
+            'slack_webhook': config.get('slack_webhook', None)
         }
         return
 
@@ -141,45 +144,67 @@ class ExceptionReporter:
 
         if cls._sentry_agent is not None:
             try:
-                await cls._sentry_agent.publish_exc(exc_info=exc_info,
-                                                    exc_data=exc_data, agent_options=default_agent_options)
+                await cls._sentry_agent.publish_exc(
+                    exc_info=exc_info,
+                    exc_data=exc_data,
+                    agent_options=default_agent_options)
             except Exception as e:
-                logger.error(f'Unhandled sentry reporting agent error: {str(e)}', e)
+                logger.error(
+                    f'Unhandled sentry reporting agent error: {str(e)}', e)
 
         if cls._slack_agent is not None:
             try:
-                await cls._slack_agent.publish_exc(exc_info=exc_info,
-                                                   exc_data=exc_data, agent_options=default_agent_options)
+                await cls._slack_agent.publish_exc(
+                    exc_info=exc_info,
+                    exc_data=exc_data,
+                    agent_options=default_agent_options)
             except Exception as e:
-                logger.error(f'Unhandled slack reporting agent error: {str(e)}', e)
+                logger.error(
+                    f'Unhandled slack reporting agent error: {str(e)}', e)
 
         if cls._clever_agent is not None:
             try:
-                await cls._clever_agent.publish_exc(exc_info=exc_info, exc_data=exc_data,
-                                                    agent_options=default_agent_options)
+                await cls._clever_agent.publish_exc(
+                    exc_info=exc_info, exc_data=exc_data,
+                    agent_options=default_agent_options)
             except Exception as e:
-                logger.error(f'Unhandled CleverTap reporting agent error: {str(e)}', e)
+                logger.error(
+                    f'Unhandled CleverTap reporting agent error: {str(e)}', e)
 
         # this is disabled at the top level
         if cls._config.get('user_reporting', False) is False:
             return
 
         # ensure that this exception should be pushed to users
-        if agent_options is not None and agent_options.get('allow_user_agents', False):
-            if app_uuid is not None and app_uuid in cls._app_agents:
+        if agent_options is not None and \
+                agent_options.get('allow_user_agents', False):
+            if app_uuid is not None and \
+                    app_uuid in cls._app_agents:
                 app_agent_config = cls._app_agents[app_uuid]
-                if cls._slack_agent is not None and 'slack_webhook' in app_agent_config:
+                if cls._slack_agent is not None and \
+                        'slack_webhook' in app_agent_config:
                     try:
-                        user_agent_options=default_agent_options.copy()
-                        user_agent_options['webhook'] = app_agent_config['slack_webhook']
-                        if cls._config.get('user_reporting_stacktrace', False) is False:
+                        user_agent_options = \
+                            default_agent_options.copy()
+
+                        user_agent_options['webhook'] = \
+                            app_agent_config['slack_webhook']
+
+                        if cls._config.\
+                                get('user_reporting_stacktrace',
+                                    False) is False:
                             user_agent_options['full_stacktrace'] = False
                             user_agent_options['no_stacktrace'] = True
                         else:
                             user_agent_options['full_stacktrace'] = True
 
-                        await cls._slack_agent.publish_exc(exc_info=exc_info,
-                                                   exc_data=exc_data, agent_options=user_agent_options)
+                        await cls._slack_agent.publish_exc(
+                            exc_info=exc_info,
+                            exc_data=exc_data,
+                            agent_options=user_agent_options)
                     except Exception as e:
-                        logger.error(f'Unhandled slack reporting agent error: {str(e)}', e)
-
+                        logger.error(
+                            f'Unhandled slack '
+                            f'reporting agent '
+                            f'error: {str(e)}',
+                            e)

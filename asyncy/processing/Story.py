@@ -81,13 +81,14 @@ class Story:
                         f'Unknown method to execute: {method}'
                     )
             except BaseException as e:
-                if isinstance(e, StoryscriptError):  # Don't wrap StoryscriptError.
+                # Don't wrap StoryscriptError.
+                if isinstance(e, StoryscriptError):
                     e.story = story  # Always set.
                     e.line = line  # Always set.
                     raise e
 
                 raise StoryscriptRuntimeError(message='Failed to execute line',
-                                         story=story, line=line, root=e)
+                                              story=story, line=line, root=e)
 
     @staticmethod
     async def execute_block(logger, story, parent_line: dict):

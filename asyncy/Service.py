@@ -15,10 +15,11 @@ from . import Version
 from .Apps import Apps
 from .Config import Config
 from .Logger import Logger
-from .reporting.Reporter import ExceptionReporter
 from .http_handlers.StoryEventHandler import StoryEventHandler
 from .processing.Services import Services
 from .processing.internal import File, Http, Json, Log
+from .reporting.Reporter import ExceptionReporter
+
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 

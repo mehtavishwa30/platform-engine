@@ -172,16 +172,13 @@ class Stories:
         if arguments:
             arg = arguments[0]
             # if first path is undefined assume command
-            if (
-                    isinstance(arg, dict) and
-                    arg['$OBJECT'] == 'path' and
-                    len(arg['paths']) == 1
-            ):
-                res = self.resolve(arguments.pop(0))
-                if res is None:
-                    results.append(arg['paths'][0])
-                else:
-                    results.append(self.encode(res))
+            if isinstance(arg, dict):
+                if arg['$OBJECT'] == 'path' and len(arg['paths']) == 1:
+                    res = self.resolve(arguments.pop(0))
+                    if res is None:
+                        results.append(arg['paths'][0])
+                    else:
+                        results.append(self.encode(res))
 
         if arguments:
             for argument in arguments:

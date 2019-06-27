@@ -15,11 +15,11 @@ from asyncy.Exceptions import StoryscriptError, TooManyActiveApps, \
 from asyncy.GraphQLAPI import GraphQLAPI
 from asyncy.Kubernetes import Kubernetes
 from asyncy.Logger import Logger
-from asyncy.reporting.Reporter import ExceptionReporter
 from asyncy.constants.ServiceConstants import ServiceConstants
 from asyncy.db.Database import Database
 from asyncy.entities.Release import Release
 from asyncy.enums.ReleaseState import ReleaseState
+from asyncy.reporting.Reporter import ExceptionReporter
 
 import psycopg2
 
@@ -142,11 +142,11 @@ async def test_init_all(patch, magic, async_mock, config, logger, db):
         config, logger, 'my_app_uuid')
 
     ExceptionReporter.init.assert_called_with({
-        "sentry_dsn": config.REPORTING_SENTRY_DSN,
-        "slack_webhook": config.REPORTING_SLACK_WEBHOOK,
-        "clevertap_config": {
-            "account": config.REPORTING_CLEVERTAP_ACCOUNT,
-            "pass": config.REPORTING_CLEVERTAP_PASS
+        'sentry_dsn': config.REPORTING_SENTRY_DSN,
+        'slack_webhook': config.REPORTING_SLACK_WEBHOOK,
+        'clevertap_config': {
+            'account': config.REPORTING_CLEVERTAP_ACCOUNT,
+            'pass': config.REPORTING_CLEVERTAP_PASS
         },
         'user_reporting': config.USER_REPORTING_ENABLED,
         'user_reporting_stacktrace': config.USER_REPORTING_STACKTRACE

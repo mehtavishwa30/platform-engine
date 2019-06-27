@@ -132,8 +132,12 @@ class Containers:
     def get_registry_url(cls, image):
         official = ['docker.io', 'index.docker.io']
         i = image.find('/')
-        if i == -1 or (not any(c in image[:i] for c in '.:') and
-                       image[:i] != 'localhost') or image[:i] in official:
+        is_default = i == -1 or image[:i] in official
+
+        if not any(c in image[:i] for c in '.:') and image[:i] != 'localhost':
+            is_default = True
+
+        if is_default:
             return 'https://index.docker.io/v1/'
         else:
             return image[:i]

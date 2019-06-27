@@ -84,8 +84,9 @@ class Services:
                 actual = story.argument_by_name(line=line, argument_name=arg)
                 resolved_args[arg] = actual
 
-        return await command.handler(story=story, line=line,
-                                     resolved_args=resolved_args)
+        return await command.handler(
+            story=story, line=line,
+            resolved_args=resolved_args)
 
     @classmethod
     async def execute_external(cls, story, line):
@@ -111,9 +112,10 @@ class Services:
             else:
                 return await cls.execute_http(story, line, chain, command_conf)
         else:
-            raise StoryscriptError(message=f'Service {service}/{line["command"]} '
-                              f'has neither http nor format sections!',
-                                   story=story, line=line)
+            raise StoryscriptError(
+                message=f'Service {service}/{line["command"]} '
+                f'has neither http nor format sections!',
+                story=story, line=line)
 
     @classmethod
     def resolve_chain(cls, story, line):
@@ -158,8 +160,9 @@ class Services:
                 chain.appendleft(Command(parent_line[LineConstants.command]))
 
             # Is this a concrete service?
-            resolved = story.app.services.get(service) is not None \
-                or cls.is_internal(service, parent_line['command'])
+            resolved = story.app.services.get(service) is not None or \
+                cls.is_internal(service, parent_line['command'])
+
             if resolved:
                 chain.appendleft(Service(service))
                 break
@@ -204,9 +207,10 @@ class Services:
         io_loop = story.context[ContextConstants.server_io_loop]
 
         if req.is_finished():
-            raise StoryscriptError(message='No more actions can be executed for '
-                                      'this service as it\'s already closed.',
-                                   story=story, line=line)
+            raise StoryscriptError(
+                message='No more actions can be executed for '
+                        'this service as it\'s already closed.',
+                story=story, line=line)
 
         # BEGIN hack for writing a binary response to the gateway
         # How we write binary response to the gateway right now:
@@ -216,7 +220,6 @@ class Services:
         # 3. Dump the bytes directly in the response
         if chain[0].name == 'http' and command.name == 'write' \
                 and isinstance(body['data']['content'], bytes):
-
             req.set_header(name='Content-Type',
                            value='application/octet-stream')
             req.write(body['data']['content'])
@@ -386,16 +389,18 @@ class Services:
                     body[arg] = FormField(arg, value)
                 form_fields_count += 1
             else:
-                raise StoryscriptError(f'Invalid location for argument "{arg}" '
-                                  f'specified: {location}',
-                                       story=story, line=line)
+                raise StoryscriptError(
+                    f'Invalid location for argument "{arg}" '
+                    f'specified: {location}',
+                    story=story, line=line)
 
         if form_fields_count > 0 and request_body_fields_count > 0:
-            raise StoryscriptError(f'Mixed locations are not permitted. '
-                              f'Found {request_body_fields_count} fields, '
-                              f'of which '
-                              f'{form_fields_count} were in the form body',
-                                   story=story, line=line)
+            raise StoryscriptError(
+                f'Mixed locations are not permitted. '
+                f'Found {request_body_fields_count} fields, '
+                f'of which '
+                f'{form_fields_count} were in the form body',
+                story=story, line=line)
 
         method = command_conf['http'].get('method', 'post')
         kwargs = {
@@ -410,7 +415,7 @@ class Services:
         elif len(body) > 0:
             raise StoryscriptError(
                 message=f'Parameters found in the request body, '
-                        f'but the method is {method}', story=story, line=line)
+                f'but the method is {method}', story=story, line=line)
 
         port = command_conf['http'].get('port', 5000)
         path = HttpUtils.add_params_to_url(
@@ -433,10 +438,11 @@ class Services:
                                         story, line, content_type)
         else:
             response_body = HttpUtils.read_response_body_quietly(response)
-            raise StoryscriptError(message=f'Failed to invoke service! '
-                              f'Status code: {response.code}; '
-                              f'response body: {response_body}',
-                                   story=story, line=line)
+            raise StoryscriptError(
+                message=f'Failed to invoke service! '
+                f'Status code: {response.code}; '
+                f'response body: {response_body}',
+                story=story, line=line)
 
     @classmethod
     def parse_output(cls, command_conf: dict, raw_output, story,
@@ -462,8 +468,8 @@ class Services:
             truncated_output = StringUtils.truncate(raw_output, 160)
             raise StoryscriptError(
                 message=f'Failed to parse output as type {t}. '
-                        f'Content-Type received: "{content_type}". '
-                        f'Output received {truncated_output}.',
+                f'Content-Type received: "{content_type}". '
+                f'Output received {truncated_output}.',
                 story=story, line=line)
 
     @classmethod
@@ -518,7 +524,7 @@ class Services:
         story.logger.debug(f'Subscription URL - {sub_url}')
 
         engine = f'{story.app.config.ENGINE_HOST}:' \
-                 f'{story.app.config.ENGINE_PORT}'
+            f'{story.app.config.ENGINE_PORT}'
 
         query_params = urllib.parse.urlencode({
             'story': story.name,
@@ -561,8 +567,8 @@ class Services:
                            f'from {s.command} via Synapse...')
 
         url = f'http://{story.app.config.ASYNCY_SYNAPSE_HOST}:' \
-              f'{story.app.config.ASYNCY_SYNAPSE_PORT}' \
-              f'/subscribe'
+            f'{story.app.config.ASYNCY_SYNAPSE_PORT}' \
+            f'/subscribe'
 
         # Okay to retry a request to the Synapse a hundred times.
         response = await HttpUtils.fetch_with_retry(100, story.logger, url,
@@ -573,8 +579,8 @@ class Services:
         else:
             raise StoryscriptError(
                 message=f'Failed to subscribe to {service} from '
-                        f'{s.command} in {s.container_name}! '
-                        f'http err={response.error}; code={response.code}',
+                f'{s.command} in {s.container_name}! '
+                f'http err={response.error}; code={response.code}',
                 story=story, line=line)
 
     @classmethod

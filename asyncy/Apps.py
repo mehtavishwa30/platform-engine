@@ -16,10 +16,11 @@ from .Exceptions import StoryscriptError, TooManyActiveApps, TooManyServices, \
     TooManyVolumes
 from .GraphQLAPI import GraphQLAPI
 from .Logger import Logger
-from .reporting.Reporter import ExceptionReporter
 from .constants.ServiceConstants import ServiceConstants
 from .db.Database import Database
 from .enums.ReleaseState import ReleaseState
+from .reporting.Reporter import ExceptionReporter
+
 
 MAX_VOLUMES_BETA = 15
 MAX_SERVICES_BETA = 15
@@ -48,7 +49,8 @@ class Apps:
     @classmethod
     async def deploy_release(cls, config, app_id, app_name, app_dns,
                              version, environment, stories,
-                             maintenance: bool, deleted: bool, owner_uuid, owner_email):
+                             maintenance: bool, deleted: bool,
+                             owner_uuid, owner_email):
         logger = cls.make_logger_for_app(config, app_id, version)
         logger.info(f'Deploying app {app_id}@{version}')
 
@@ -71,9 +73,10 @@ class Apps:
         if environment is not None:
             # allow user based reporting in the engine. This makes it
             # possible for users to retrieve deploy errors
-            if "REPORTING_SLACK_WEBHOOK" in environment and config.USER_REPORTING_ENABLED is not False:
+            if 'REPORTING_SLACK_WEBHOOK' in environment and \
+                    config.USER_REPORTING_ENABLED is not False:
                 ExceptionReporter.init_app_agents(app_id, {
-                    "slack_webhook": environment["REPORTING_SLACK_WEBHOOK"]
+                    'slack_webhook': environment['REPORTING_SLACK_WEBHOOK']
                 })
 
         try:
@@ -105,8 +108,10 @@ class Apps:
 
             app_config = cls.get_app_config(raw=stories.get('yaml', {}))
 
-            app = App(app_id, app_name, app_dns, version, config, logger,
-                      stories, services, environment, owner_uuid, owner_email, app_config)
+            app = App(app_id, app_name, app_dns, version,
+                      config, logger, stories, services,
+                      environment, owner_uuid, owner_email,
+                      app_config)
 
             await Containers.clean_app(app)
 
@@ -124,14 +129,16 @@ class Apps:
 
             if isinstance(e, StoryscriptError):
                 logger.error(str(e))
-                ExceptionReporter.capture_exc(exc_info=e, story=e.story, line=e.line, agent_options={
-                    'app_name': app_name,
-                    'app_uuid': app_id,
-                    'app_version': version,
-                    'clever_ident': owner_email,
-                    'clever_event': 'App Deploy Failed',
-                    'allow_user_agents': True
-                })
+                ExceptionReporter.capture_exc(
+                    exc_info=e, story=e.story,
+                    line=e.line, agent_options={
+                        'app_name': app_name,
+                        'app_uuid': app_id,
+                        'app_version': version,
+                        'clever_ident': owner_email,
+                        'clever_event': 'App Deploy Failed',
+                        'allow_user_agents': True
+                    })
             else:
                 logger.error(f'Failed to bootstrap app ({e})', exc=e)
                 ExceptionReporter.capture_exc(exc_info=e, agent_options={
@@ -171,11 +178,11 @@ class Apps:
         # we need to initialize the engine's exception reporter
         # so we can handle reporting in an efficient manner
         ExceptionReporter.init({
-            "sentry_dsn": config.REPORTING_SENTRY_DSN,
-            "slack_webhook": config.REPORTING_SLACK_WEBHOOK,
-            "clevertap_config": {
-                "account": config.REPORTING_CLEVERTAP_ACCOUNT,
-                "pass": config.REPORTING_CLEVERTAP_PASS
+            'sentry_dsn': config.REPORTING_SENTRY_DSN,
+            'slack_webhook': config.REPORTING_SLACK_WEBHOOK,
+            'clevertap_config': {
+                'account': config.REPORTING_CLEVERTAP_ACCOUNT,
+                'pass': config.REPORTING_CLEVERTAP_PASS
             },
             'user_reporting': config.USER_REPORTING_ENABLED,
             'user_reporting_stacktrace': config.USER_REPORTING_STACKTRACE

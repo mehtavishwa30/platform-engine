@@ -4,7 +4,8 @@ import time
 from .Mutations import Mutations
 from .Services import Services
 from .. import Metrics
-from ..Exceptions import StoryscriptError, StoryscriptRuntimeError, InvalidKeywordUsage
+from ..Exceptions import InvalidKeywordUsage, \
+    StoryscriptError, StoryscriptRuntimeError
 from ..Stories import Stories
 from ..Types import StreamingService
 from ..constants.LineConstants import LineConstants
@@ -88,8 +89,9 @@ class Lexicon:
             result = await Story.execute_block(logger, story, function_line)
             if LineSentinels.is_sentinel(result):
                 if not isinstance(result, ReturnSentinel):
-                    raise StoryscriptRuntimeError(f'Uncaught sentinel has '
-                                             f'escaped! sentinel={result}')
+                    raise StoryscriptRuntimeError(
+                        f'Uncaught sentinel has '
+                        f'escaped! sentinel={result}')
 
                 return_from_function_call = result.return_value
 
@@ -157,7 +159,7 @@ class Lexicon:
     def _is_if_condition_true(story, line):
         if len(line['args']) != 1:
             raise StoryscriptError(message=f'Complex if condition found! '
-                                      f'len={len(line["args"])}',
+                                   f'len={len(line["args"])}',
                                    story=story, line=line)
 
         return story.resolve(line['args'][0], encode=False)
@@ -200,10 +202,13 @@ class Lexicon:
                 if next_line is None:
                     return None
 
+                else_or_elif = next_line['method'] == 'elif' or \
+                    next_line['method'] == 'else'
+
+                same_parent = next_line.get('parent') == line.get('parent')
+
                 # Ensure that the elif/else is in the same parent.
-                if next_line.get('parent') == line.get('parent') and \
-                        (next_line['method'] == 'elif' or
-                         next_line['method'] == 'else'):
+                if same_parent and else_or_elif:
                     # Continuing this loop will mean that step 1 in the
                     # execution strategy is performed.
                     line = next_line
@@ -263,8 +268,10 @@ class Lexicon:
             next_line = story.next_block(line)
             return Lexicon.line_number_or_none(next_line)
         else:
-            raise StoryscriptError(message=f'Unknown service {service} for when!',
-                                   story=story, line=line)
+            raise StoryscriptError(
+                message=f'Unknown service {service} for when!',
+                story=story, line=line
+            )
 
     @classmethod
     async def ret(cls, logger, story: Stories, line):

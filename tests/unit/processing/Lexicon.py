@@ -3,7 +3,7 @@ from unittest import mock
 from unittest.mock import MagicMock, Mock
 
 from asyncy import Metrics
-from asyncy.Exceptions import StoryscriptError, InvalidKeywordUsage
+from asyncy.Exceptions import InvalidKeywordUsage, StoryscriptError
 from asyncy.Stories import Stories
 from asyncy.Types import StreamingService
 from asyncy.constants.LineConstants import LineConstants

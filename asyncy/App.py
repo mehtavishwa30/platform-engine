@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import json
+import typing
 from collections import namedtuple
 
-import typing
 from requests.structures import CaseInsensitiveDict
 
 from tornado.httpclient import AsyncHTTPClient
@@ -36,9 +36,13 @@ class App:
     The runtime config for this app.
     """
 
-    def __init__(self, app_id: str, app_name: str, app_dns: str, version: int, config: Config,
-                 logger: Logger, stories: dict, services: dict,
-                 environment: dict, owner_uuid: str, owner_email: typing.Union[str, None], app_config: AppConfig):
+    def __init__(self, app_id: str, app_name: str, app_dns: str,
+                 version: int, config: Config,
+                 logger: Logger, stories: dict,
+                 services: dict, environment: dict,
+                 owner_uuid: str,
+                 owner_email: typing.Union[str, None],
+                 app_config: AppConfig):
         self._subscriptions = {}
         self.app_id = app_id
         self.app_name = app_name
