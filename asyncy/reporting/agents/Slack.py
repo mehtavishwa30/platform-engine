@@ -1,32 +1,34 @@
 import json
-import os
-import re
-import sys
 import traceback
-from os.path import join
 
 from tornado.httpclient import AsyncHTTPClient
 
-from asyncy import Logger
-from asyncy.Exceptions import StoryscriptError
-from asyncy.reporting.Agent import ReportingAgent
-from asyncy.utils.HttpUtils import HttpUtils
+from ... import Logger
+from ...Exceptions import StoryscriptError
+from ..Agent import ReportingAgent
+from ...utils.HttpUtils import HttpUtils
 
 
 class SlackAgent(ReportingAgent):
 
-    def __init__(self, webhook: str, logger: Logger):
+    def __init__(self, webhook: str, release: str, logger: Logger):
         self._webhook = webhook
+        self._release = release
         self._logger = logger
         self._http_client = AsyncHTTPClient()
 
-    async def publish_exc(self, exc_info: Exception, exc_data: dict, agent_options=None):
+    async def publish_exc(self, exc_info: BaseException, exc_data: dict, agent_options=None):
         if self._webhook is None and agent_options is None:
             return
 
-        story_name = None
-        app_uuid = None
-        app_version = None
+        story_name = ""
+        story_line = ""
+        app_uuid = ""
+        app_version = ""
+        app_name = ""
+
+        if 'app_name' in exc_data:
+            app_name = f"*App Name*: {exc_data['app_name']}\n"
 
         if 'app_uuid' in exc_data:
             app_uuid = f"*App UUID*: {exc_data['app_uuid']}\n"
@@ -35,7 +37,10 @@ class SlackAgent(ReportingAgent):
             app_version = f"*App Version*: {exc_data['app_version']}\n"
 
         if 'story_name' in exc_data:
-            story_name = f"*Story Name*: {exc_data['story_name']}\n\n"
+            story_name = f"*Story Name*: {exc_data['story_name']}\n"
+
+        if 'story_line' in exc_data:
+            story_line = f"*Story Line Number*: {exc_data['story_line']}\n\n"
 
         _traceback = self.cleanup_traceback(''.join(traceback.format_tb(exc_info.__traceback__)))
 
@@ -56,9 +61,12 @@ class SlackAgent(ReportingAgent):
             traceback_line = f"```{err_str}\n\nTraceback:\n{_traceback}```"
 
         err_msg = f"An exception occurred with the following information:\n\n" \
-            f"{app_uuid}" \
+            f"*Platform Engine Release*: {self._release}\n" \
+            f"{app_name}" \
+            f"{app_uuid}"  \
             f"{app_version}" \
             f"{story_name}" \
+            f"{story_line}" \
             f"{traceback_line}"
 
         webhook = self._webhook

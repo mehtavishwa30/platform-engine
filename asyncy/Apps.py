@@ -117,14 +117,18 @@ class Apps:
             if isinstance(e, StoryscriptError):
                 logger.error(str(e))
                 ExceptionReporter.capture_exc(exc_info=e, story=e.story, line=e.line, agent_options={
+                    'app_name': app_name,
+                    'app_uuid': app_id,
+                    'app_version': version,
                     'clever_ident': owner_email,
                     'clever_event': 'App Deploy Failed'
                 })
             else:
                 logger.error(f'Failed to bootstrap app ({e})', exc=e)
                 ExceptionReporter.capture_exc(exc_info=e, agent_options={
-                    "app_uuid": app_id,
-                    "app_version": version,
+                    'app_name': app_name,
+                    'app_uuid': app_id,
+                    'app_version': version,
                     'clever_ident': owner_email,
                     'clever_event': 'App Deploy Failed'
                 })
@@ -254,7 +258,7 @@ class Apps:
                                   update_db_state=True)
 
         can_deploy = False
-
+        release = None
         try:
             can_deploy = await cls.deployment_lock.try_acquire(app_id)
             if not can_deploy:
@@ -285,22 +289,22 @@ class Apps:
         except BaseException as e:
             glogger.error(
                 f'Failed to reload app {app_id}', exc=e)
-            # todo get release email for sentry
-            if release is not None:
 
+            if release is not None:
                 ExceptionReporter.capture_exc(exc_info=e, agent_options={
-                    'app_uuid': app_id,
+                    'app_name': release.app_name,
+                    'app_uuid': release.app_uuid,
                     'app_version': release.version,
                     'clever_ident': release.owner_email,
-                    'clever_event': 'App Deploy Failed'
-                 })
-            # todo add clevertap catch
-            if isinstance(e, asyncio.TimeoutError):
-                logger = cls.make_logger_for_app(config, app_id,
-                                                 release.version)
-                Database.update_release_state(logger, config, app_id,
-                                              release.version,
-                                              ReleaseState.TIMED_OUT)
+                    'clever_event': 'App Reload Failed'
+                })
+
+                if isinstance(e, asyncio.TimeoutError):
+                    logger = cls.make_logger_for_app(config, app_id,
+                                                     release.version)
+                    Database.update_release_state(logger, config, app_id,
+                                                  release.version,
+                                                  ReleaseState.TIMED_OUT)
         finally:
             if can_deploy:
                 # If we did acquire the lock, then we must release it.
@@ -314,8 +318,9 @@ class Apps:
                 await cls.destroy_app(app)
             except BaseException as e:
                 ExceptionReporter.capture_exc(exc_info=e, agent_options={
-                    "app_uuid": app.app_id,
-                    "app_version": app.version
+                    'app_name': app.app_name,
+                    'app_uuid': app.app_id,
+                    'app_version': app.version
                 })
 
     @classmethod
