@@ -2,7 +2,7 @@
 from unittest.mock import MagicMock
 
 from asyncy.Exceptions import StoryscriptError
-from asyncy.Sentry import Sentry
+from asyncy.reporting.Reporter import ExceptionReporter
 from asyncy.http_handlers.BaseHandler import BaseHandler
 
 from pytest import mark
@@ -30,18 +30,21 @@ def test_finished(magic, logger):
 @mark.parametrize('story_name', [None, 'super_story'])
 def test_handle_story_exc(patch, magic, logger, exception, story_name):
     handler = BaseHandler(magic(), magic(), logger=logger)
-    patch.object(Sentry, 'capture_exc')
+    patch.object(ExceptionReporter, 'capture_exc')
     patch.many(handler, ['set_status', 'finish'])
     handler.handle_story_exc('app_id', story_name, exception)
     handler.set_status.assert_called_with(500, 'Story execution failed')
     handler.finish.assert_called()
     logger.error.assert_called()
     if isinstance(exception, StoryscriptError):
-        Sentry.capture_exc.assert_called_with(
-            exception, exception.story, exception.line)
+        ExceptionReporter.capture_exc.assert_called_with(
+            exc_info=exception, story=exception.story, line=exception.line)
     elif story_name is not None:
-        Sentry.capture_exc.assert_called_with(exception, extra={
-            'story_name': story_name
+        ExceptionReporter.capture_exc.assert_called_with(exc_info=exception, agent_options={
+            'story_name': story_name,
+            'app_uuid': 'app_id'
         })
     else:
-        Sentry.capture_exc.assert_called_with(exception)
+        ExceptionReporter.capture_exc.assert_called_with(exc_info=exception, agent_options={
+            'app_uuid': 'app_id'
+        })

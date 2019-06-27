@@ -68,21 +68,23 @@ class Database:
                             where state != 'NO_DEPLOY'::release_state
                             group by app_uuid)
             select app_uuid, id as version, config environment,
-                   payload stories,
+                   payload stories, apps.name as app_name,
                    maintenance, hostname app_dns, state, deleted,
-                   apps.owner_uuid
+                   apps.owner_uuid, owner_emails.email as owner_email
             from latest
                    inner join releases using (app_uuid, id)
                    inner join apps on (latest.app_uuid = apps.uuid)
                    inner join app_dns using (app_uuid)
+                   left join app_public.owner_emails on
+                    (apps.owner_uuid = owner_emails.owner_uuid)
             where app_uuid = %s;
             """
             db.cur.execute(query, (app_id,))
             data = db.cur.fetchone()
-            return Release(app_uuid=data['app_uuid'], version=data['version'],
+            return Release(app_uuid=data['app_uuid'], app_name=data['app_name'], version=data['version'],
                            environment=data['environment'],
                            stories=data['stories'],
                            maintenance=data['maintenance'],
                            app_dns=data['app_dns'],
                            state=data['state'], deleted=data['deleted'],
-                           owner_uuid=data['owner_uuid'])
+                           owner_uuid=data['owner_uuid'], owner_email=data['owner_email'])

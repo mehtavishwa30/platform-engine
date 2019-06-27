@@ -31,8 +31,8 @@ def exc(patch):
 
 @fixture
 def app(config, logger, magic):
-    return App('app_id', 'app_dns', logger, config,
-               magic(), magic(), magic(), {}, 'owner_uuid', magic())
+    return App('app_id', 'app_name', 'app_dns', logger, config,
+               magic(), magic(), magic(), {}, 'owner_uuid', 'example@example.com', magic())
 
 
 def test_add_subscription(patch, app, magic):
@@ -131,8 +131,9 @@ def test_app_init(magic, config, logger, env):
     version = 100
     app_config = magic()
     config.APP_DOMAIN = 'asyncyapp.com'
-    app = App('app_id', 'app_dns', version, config, logger,
-              stories, services, env, 'owner_1', app_config)
+    app = App('app_id', 'app_name', 'app_dns', version, config, logger,
+              stories, services, env, 'owner_1',
+              'example@example.com', app_config)
 
     if env is None:
         env = {}
@@ -142,6 +143,7 @@ def test_app_init(magic, config, logger, env):
     assert app.config == config
     assert app.logger == logger
     assert app.owner_uuid == 'owner_1'
+    assert app.owner_email == 'example@example.com'
     assert app.stories == stories['stories']
     assert app.services == services
     assert app.environment == env

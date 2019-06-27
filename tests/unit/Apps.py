@@ -15,7 +15,7 @@ from asyncy.Exceptions import StoryscriptError, TooManyActiveApps, \
 from asyncy.GraphQLAPI import GraphQLAPI
 from asyncy.Kubernetes import Kubernetes
 from asyncy.Logger import Logger
-from asyncy.Sentry import Sentry
+from asyncy.reporting.Reporter import ExceptionReporter
 from asyncy.constants.ServiceConstants import ServiceConstants
 from asyncy.db.Database import Database
 from asyncy.entities.Release import Release
@@ -102,7 +102,7 @@ async def test_destroy_all(patch, async_mock, magic):
 @mark.asyncio
 async def test_destroy_all_exc(patch, async_mock, magic):
     app = magic()
-    patch.object(Sentry, 'capture_exc')
+    patch.object(ExceptionReporter, 'capture_exc')
 
     err = BaseException()
 
@@ -114,13 +114,16 @@ async def test_destroy_all_exc(patch, async_mock, magic):
     app.app_id = 'app_id'
     await Apps.destroy_all()
 
-    Sentry.capture_exc.assert_called_with(err)
+    ExceptionReporter.capture_exc.assert_called_with(exc_info=err, agent_options={
+        'app_uuid': 'app_id',
+        'app_version': app.version
+    })
 
 
 @mark.asyncio
 async def test_init_all(patch, magic, async_mock, config, logger, db):
     db()
-    patch.object(Sentry, 'init')
+    patch.object(ExceptionReporter, 'init')
     patch.init(Thread)
     patch.object(Thread, 'start')
 
@@ -131,11 +134,18 @@ async def test_init_all(patch, magic, async_mock, config, logger, db):
                  return_value=apps)
     patch.object(Apps, 'reload_app', new=async_mock())
 
-    await Apps.init_all('sentry_dsn', 'release_ver', config, logger)
+    await Apps.init_all('release_ver', config, logger)
     Apps.reload_app.mock.assert_called_with(
         config, logger, 'my_app_uuid')
 
-    Sentry.init.assert_called_with('sentry_dsn', 'release_ver')
+    ExceptionReporter.init.assert_called_with({
+        "sentry_dsn": config.REPORTING_SENTRY_DSN,
+        "slack_webhook": config.REPORTING_SLACK_WEBHOOK,
+        "clevertap_config": {
+            "account": config.REPORTING_CLEVERTAP_ACCOUNT,
+            "pass": config.REPORTING_CLEVERTAP_PASS
+        }
+    }, 'release_ver', logger)
 
     loop = asyncio.get_event_loop()
     Thread.__init__.assert_called_with(target=Apps.listen_to_releases,
@@ -166,12 +176,14 @@ async def test_reload_app_ongoing_deployment(config, logger, patch):
 @mark.asyncio
 async def test_reload_app_no_story(patch, config, logger, db, async_mock):
     app_id = 'app_id'
+    app_name = 'app_name'
 
     patch.object(Apps, 'destroy_app', new=async_mock())
     patch.object(Apps, 'deploy_release', new=async_mock())
 
     release = Release(
         app_uuid=app_id,
+        app_name=app_name,
         version=1,
         environment={},
         stories=None,
@@ -179,7 +191,8 @@ async def test_reload_app_no_story(patch, config, logger, db, async_mock):
         app_dns='app_dns',
         state='QUEUED',
         deleted=True,
-        owner_uuid='owner_uuid'
+        owner_uuid='owner_uuid',
+        owner_email='owner_email'
     )
     patch.object(Database, 'get_release_for_deployment', return_value=release)
 
@@ -195,9 +208,10 @@ async def test_reload_app(patch, config, logger, db, async_mock,
                           magic, raise_exc, previous_state):
     old_app = magic()
     app_id = 'app_id'
+    app_name = 'app_name'
     app_dns = 'app_dns'
     Apps.apps = {app_id: old_app}
-    patch.object(Sentry, 'capture_exc')
+    patch.object(ExceptionReporter, 'capture_exc')
     app_logger = magic()
     patch.object(Apps, 'make_logger_for_app', return_value=app_logger)
     patch.object(Database, 'update_release_state')
@@ -211,6 +225,7 @@ async def test_reload_app(patch, config, logger, db, async_mock,
 
     release = Release(
         app_uuid=app_id,
+        app_name=app_name,
         version=1,
         environment={},
         stories={},
@@ -218,7 +233,8 @@ async def test_reload_app(patch, config, logger, db, async_mock,
         app_dns=app_dns,
         state=previous_state,
         deleted=True,
-        owner_uuid='owner_uuid'
+        owner_uuid='owner_uuid',
+        owner_email='example@example.com'
     )
     patch.object(Database, 'get_release_for_deployment', return_value=release)
 
@@ -233,13 +249,13 @@ async def test_reload_app(patch, config, logger, db, async_mock,
         return
 
     Apps.deploy_release.mock.assert_called_with(
-        config, app_id, app_dns,
+        config, app_id, app_name, app_dns,
         release.version, release.environment, release.stories,
-        release.maintenance, release.deleted, release.owner_uuid)
+        release.maintenance, release.deleted, release.owner_uuid, release.owner_email)
 
     if raise_exc:
         logger.error.assert_called()
-        Sentry.capture_exc.assert_called()
+        ExceptionReporter.capture_exc.assert_called()
     else:
         logger.error.assert_not_called()
 
@@ -259,8 +275,8 @@ async def test_deploy_release_many_services(patch):
     for i in range(20):
         stories['services'][f'service_{i}'] = {}
 
-    await Apps.deploy_release({}, 'app_id', 'app_dns', 'app_version', {},
-                              stories, False, False, 'owner_uuid')
+    await Apps.deploy_release({}, 'app_id', 'app_name', 'app_dns', 'app_version', {},
+                              stories, False, False, 'owner_uuid', 'example@example.com')
 
     TooManyServices.__init__.assert_called_with(20, 15)
     Database.update_release_state.assert_called()
@@ -282,8 +298,8 @@ async def test_deploy_release_many_apps(patch, magic):
             Apps.apps[f'app_{i}'].owner_uuid = 'owner_uuid'
             stories['services'][f'service_{i}'] = {}
 
-        await Apps.deploy_release({}, 'app_id', 'app_dns', 'app_version', {},
-                                  stories, False, False, 'owner_uuid')
+        await Apps.deploy_release({}, 'app_id', 'app_name', 'app_dns', 'app_version', {},
+                                  stories, False, False, 'owner_uuid', 'example@example.com')
 
         TooManyActiveApps.__init__.assert_called_with(20, 5)
         Database.update_release_state.assert_called()
@@ -320,8 +336,8 @@ async def test_deploy_release_many_volumes(patch, async_mock):
     patch.object(Apps, 'get_services',
                  new=async_mock(return_value=stories['services']))
 
-    await Apps.deploy_release({}, 'app_id', 'app_dns', 'app_version', {},
-                              stories, False, False, 'owner_uuid')
+    await Apps.deploy_release({}, 'app_id', 'app_name', 'app_dns', 'app_version', {},
+                              stories, False, False, 'owner_uuid', 'example@example.com')
 
     TooManyVolumes.__init__.assert_called_with(20, 15)
     Database.update_release_state.assert_called()
@@ -333,7 +349,7 @@ async def test_deploy_release_many_volumes(patch, async_mock):
 @mark.asyncio
 async def test_deploy_release(config, magic, patch, deleted,
                               async_mock, raise_exc, maintenance):
-    patch.object(Sentry, 'capture_exc')
+    patch.object(ExceptionReporter, 'capture_exc')
     patch.object(Kubernetes, 'clean_namespace', new=async_mock())
     patch.object(Containers, 'init', new=async_mock())
     patch.object(Database, 'update_release_state')
@@ -353,8 +369,8 @@ async def test_deploy_release(config, magic, patch, deleted,
         patch.object(App, 'bootstrap', new=async_mock())
 
     await Apps.deploy_release(
-        config, 'app_id', 'app_dns', 'version', 'env',
-        {'stories': True}, maintenance, deleted, 'owner_uuid')
+        config, 'app_id', 'app_name', 'app_dns', 'version', 'env',
+        {'stories': True}, maintenance, deleted, 'owner_uuid', 'example@example.com')
 
     if maintenance:
         assert Database.update_release_state.call_count == 0
@@ -370,13 +386,13 @@ async def test_deploy_release(config, magic, patch, deleted,
         App.__init__.assert_called_with(
             'app_id', 'app_dns', 'version', config,
             app_logger,
-            {'stories': True}, services, 'env', 'owner_uuid', app_config)
+            {'stories': True}, services, 'env', 'owner_uuid', 'example@example.com', app_config)
         App.bootstrap.mock.assert_called()
         Containers.init.mock.assert_called()
         if raise_exc is not None:
             assert Apps.apps.get('app_id') is None
             if raise_exc == exc:
-                Sentry.capture_exc.assert_called()
+                ExceptionReporter.capture_exc.assert_called()
             assert Database.update_release_state.mock_calls[1] == mock.call(
                 app_logger, config, 'app_id', 'version', ReleaseState.FAILED)
         else:
