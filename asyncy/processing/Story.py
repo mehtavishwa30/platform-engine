@@ -138,7 +138,7 @@ class Story:
             story.prepare(context)
 
             if function_name:
-                raise StoryscriptRuntimeError('No longer supported')
+                raise StoryscriptRuntimeError('No longer supported', story=story, line=story.line(block))
             elif block:
                 await cls.execute_block(logger, story, story.line(block))
             else:
