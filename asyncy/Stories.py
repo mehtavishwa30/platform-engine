@@ -2,6 +2,7 @@
 import pathlib
 import time
 import uuid
+from contextlib import contextmanager
 from json import dumps
 
 from .utils import Dict
@@ -25,8 +26,20 @@ class Stories:
         self.containers = None
         self.repository = None
         self.version = None
+        self._stack = []
         self.execution_id = str(uuid.uuid4())
         self._tmp_dir_created = False
+
+    @contextmanager
+    def new_frame(self, line_number: str):
+        # No need for a try/finally block, since we don't want to unwind
+        # the stack when an exception occurs.
+        self._stack.append(line_number)
+        yield
+        self._stack.pop()
+
+    def get_stack(self) -> []:
+        return self._stack
 
     def create_tmp_dir(self):
         if self._tmp_dir_created:
