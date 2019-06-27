@@ -7,6 +7,8 @@ from logging import Formatter, LoggerAdapter, StreamHandler, getLevelName
 
 from frustum import Frustum
 
+from .Exceptions import AsyncyError
+
 log_json = strtobool(os.getenv('LOG_FORMAT_JSON', 'False'))
 
 
@@ -20,11 +22,22 @@ class Adapter(LoggerAdapter):
         if not self.isEnabledFor(level):
             return
 
+        exc = kwargs.get('exc_info')
+        if exc and hasattr(exc, 'message'):
+            message = exc.message
         message = message.strip()
         message, kwargs = self.process(message, kwargs)
 
         app_id = self.extra['app_id']
         version = self.extra['version']
+
+        if exc:
+            if isinstance(exc, AsyncyError):
+                message = str(exc)
+                del kwargs['exc_info']
+            else:
+                tb = traceback.format_exc()
+                message += '\n' + tb
 
         if log_json:
             json_log = {
@@ -33,10 +46,6 @@ class Adapter(LoggerAdapter):
                 'level': getLevelName(level),
                 'message': message
             }
-
-            if kwargs.get('exc_info') is not None:
-                tb = traceback.format_exc()
-                json_log['message'] += '\n' + tb
 
             self.logger.log(level, json_log, *args, **kwargs)
         else:

@@ -47,7 +47,7 @@ class GraphQLAPI:
 
         res = graph_result['data']['serviceByAlias']
         if not res:
-            raise ServiceNotFound(name=f'{alias}:{tag}')
+            raise ServiceNotFound(service=alias, tag=tag)
 
         return (
             res['pullUrl'],
@@ -98,7 +98,7 @@ class GraphQLAPI:
         if len(graph_result['data']['allOwners']['nodes']) == 0 \
                 or len(graph_result['data']['allOwners']['nodes']
                        [0]['services']['nodes']) == 0:
-            raise ServiceNotFound(name=f'{image}:{tag}')
+            raise ServiceNotFound(service=image, tag=tag)
 
         res = \
             graph_result['data']['allOwners']['nodes'][0][

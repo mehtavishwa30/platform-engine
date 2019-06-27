@@ -335,8 +335,6 @@ async def test_app_run_stories_exc(patch, app, async_mock, exc):
     with pytest.raises(Exception):
         await app.run_stories()
 
-    app.logger.error.assert_called_once()
-
 
 @mark.asyncio
 @mark.parametrize('status_code', [200, 500])

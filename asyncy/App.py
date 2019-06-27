@@ -153,11 +153,7 @@ class App:
         register with the gateway, and queue cron jobs.
         """
         for story_name in self.entrypoint:
-            try:
-                await Story.run(self, self.logger, story_name)
-            except Exception as e:
-                self.logger.error('Failed to bootstrap story', exc=e)
-                raise e
+            await Story.run(self, self.logger, story_name)
 
     def add_subscription(self, sub_id: str,
                          streaming_service: StreamingService,

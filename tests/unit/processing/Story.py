@@ -78,8 +78,10 @@ async def test_story_execute_line_generic(patch, logger, story,
     patch.object(Lexicon, method.lexicon_name, new=async_mock())
 
     patch.object(story, 'line', return_value={'method': method.name})
-    patch.object(story, 'start_line')
+    patch.many(story, ['start_line', 'new_frame'])
     result = await Story.execute_line(logger, story, '1')
+
+    story.new_frame.assert_called_with('1')
 
     mock = getattr(Lexicon, method.lexicon_name)
     if method.async_mock:
@@ -246,6 +248,7 @@ async def test_story_run_prepare_block(patch, app, logger, async_mock):
                     context='context', block=block)
     Story.story().prepare.assert_called_with('context')
     Story.story().line.assert_called_with(block)
+    Story.story().new_frame.assert_called_with(block)
     Story.execute_block.mock \
         .assert_called_with(logger, Story.story(),
                             Story.story().line())
