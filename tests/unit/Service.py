@@ -41,11 +41,10 @@ async def test_init_wrapper(patch, async_mock):
     import asyncy.Service as ServiceFile
     ServiceFile.config = MagicMock()
     ServiceFile.logger = MagicMock()
-    sentry = 'sentry_dsn'
     release = 'release_ver'
-    await Service.init_wrapper(sentry, release)
-    Apps.init_all.mock.assert_called_with(
-        sentry, release, ServiceFile.config, ServiceFile.logger)
+    await Service.init_wrapper(release)
+    Apps.init_all.mock.assert_called_with(release, ServiceFile.config,
+                                          ServiceFile.logger)
 
 
 @mark.asyncio
@@ -55,7 +54,7 @@ async def test_init_wrapper_exc(patch, async_mock, magic):
 
     patch.object(Apps, 'init_all', new=async_mock(side_effect=exc))
     patch.object(sys, 'exit')
-    await Service.init_wrapper(magic(), magic())
+    await Service.init_wrapper(magic())
     sys.exit.assert_called()
 
 

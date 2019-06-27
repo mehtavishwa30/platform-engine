@@ -73,18 +73,21 @@ def test_get_release_for_deployment(patch, config, database):
                             where state != 'NO_DEPLOY'::release_state
                             group by app_uuid)
             select app_uuid, id as version, config environment,
-                   payload stories,
+                   payload stories, apps.name as app_name,
                    maintenance, hostname app_dns, state, deleted,
-                   apps.owner_uuid
+                   apps.owner_uuid, owner_emails.email as owner_email
             from latest
                    inner join releases using (app_uuid, id)
                    inner join apps on (latest.app_uuid = apps.uuid)
                    inner join app_dns using (app_uuid)
+                   left join app_public.owner_emails on
+                    (apps.owner_uuid = owner_emails.owner_uuid)
             where app_uuid = %s;
             """
 
     patch.object(database.cur, 'fetchone', return_value={
         'app_uuid': 'my_app_uuid',
+        'app_name': 'my_app_name',
         'version': 'my_version',
         'environment': 'my_environment',
         'stories': 'my_stories',
@@ -93,12 +96,14 @@ def test_get_release_for_deployment(patch, config, database):
         'state': 'my_state',
         'deleted': 'my_deleted',
         'owner_uuid': 'my_owner_uuid',
+        'owner_email': 'my_owner_email'
     })
 
     ret = Database.get_release_for_deployment(config, app_id)
 
     assert ret == Release(
         app_uuid='my_app_uuid',
+        app_name='my_app_name',
         version='my_version',
         environment='my_environment',
         stories='my_stories',
@@ -107,6 +112,7 @@ def test_get_release_for_deployment(patch, config, database):
         state='my_state',
         deleted='my_deleted',
         owner_uuid='my_owner_uuid',
+        owner_email='my_owner_email'
     )
 
     database.cur.execute.assert_called_with(expected_query, (app_id,))

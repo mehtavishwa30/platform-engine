@@ -7,7 +7,7 @@ from logging import Formatter, LoggerAdapter, StreamHandler, getLevelName
 
 from frustum import Frustum
 
-from .Exceptions import AsyncyError
+from .Exceptions import StoryscriptError
 
 log_json = strtobool(os.getenv('LOG_FORMAT_JSON', 'False'))
 
@@ -32,7 +32,7 @@ class Adapter(LoggerAdapter):
         version = self.extra['version']
 
         if exc:
-            if isinstance(exc, AsyncyError):
+            if isinstance(exc, StoryscriptError):
                 message = str(exc)
                 del kwargs['exc_info']
             else:

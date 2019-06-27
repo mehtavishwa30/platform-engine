@@ -81,7 +81,7 @@ class Story:
                         f'Unknown method to execute: {method}'
                     )
             except BaseException as e:
-                if isinstance(e, StoryscriptError):  # Don't wrap AsyncyError.
+                if isinstance(e, StoryscriptError):  # Don't wrap StoryscriptError.
                     e.story = story  # Always set.
                     e.line = line  # Always set.
                     raise e
@@ -139,9 +139,10 @@ class Story:
             story.prepare(context)
 
             if function_name:
-                raise AsyncyRuntimeError('No longer supported')
+                raise StoryscriptRuntimeError('No longer supported')
             elif block:
-                await cls.execute_block(logger, story, story.line(block))
+                with story.new_frame(block):
+                    await cls.execute_block(logger, story, story.line(block))
             else:
                 await cls.execute(logger, story)
 

@@ -181,7 +181,9 @@ class Containers:
 
         if spec is None:
             raise ContainerSpecNotRegisteredError(
-                container_name=container_name
+                container_name=container_name,
+                story=story,
+                line=line
             )
 
         args = spec[ServiceConstants.config]['actions'][command]\

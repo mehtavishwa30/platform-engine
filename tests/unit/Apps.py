@@ -112,12 +112,15 @@ async def test_destroy_all_exc(patch, async_mock, magic):
     app.destroy = exc
     Apps.apps = {'app_id': app}
     app.app_id = 'app_id'
+    app.app_name = 'app_name'
     await Apps.destroy_all()
 
-    ExceptionReporter.capture_exc.assert_called_with(exc_info=err, agent_options={
-        'app_uuid': 'app_id',
-        'app_version': app.version
-    })
+    ExceptionReporter.capture_exc.assert_called_with(
+        exc_info=err, agent_options={
+            'app_uuid': app.app_id,
+            'app_version': app.version,
+            'app_name': app.app_name
+        })
 
 
 @mark.asyncio
@@ -144,7 +147,9 @@ async def test_init_all(patch, magic, async_mock, config, logger, db):
         "clevertap_config": {
             "account": config.REPORTING_CLEVERTAP_ACCOUNT,
             "pass": config.REPORTING_CLEVERTAP_PASS
-        }
+        },
+        'user_reporting': config.USER_REPORTING_ENABLED,
+        'user_reporting_stacktrace': config.USER_REPORTING_STACKTRACE
     }, 'release_ver', logger)
 
     loop = asyncio.get_event_loop()
@@ -251,7 +256,8 @@ async def test_reload_app(patch, config, logger, db, async_mock,
     Apps.deploy_release.mock.assert_called_with(
         config, app_id, app_name, app_dns,
         release.version, release.environment, release.stories,
-        release.maintenance, release.deleted, release.owner_uuid, release.owner_email)
+        release.maintenance, release.deleted,
+        release.owner_uuid, release.owner_email)
 
     if raise_exc:
         logger.error.assert_called()
@@ -276,8 +282,10 @@ async def test_deploy_release_many_services(patch):
     for i in range(20):
         stories['services'][f'service_{i}'] = {}
 
-    await Apps.deploy_release({}, 'app_id', 'app_name', 'app_dns', 'app_version', {},
-                              stories, False, False, 'owner_uuid', 'example@example.com')
+    await Apps.deploy_release({}, 'app_id', 'app_name',
+                              'app_dns', 'app_version', {},
+                              stories, False, False, 'owner_uuid',
+                              'example@example.com')
 
     TooManyServices.__init__.assert_called_with(20, 15)
     Database.update_release_state.assert_called()
@@ -300,8 +308,10 @@ async def test_deploy_release_many_apps(patch, magic):
             Apps.apps[f'app_{i}'].owner_uuid = 'owner_uuid'
             stories['services'][f'service_{i}'] = {}
 
-        await Apps.deploy_release({}, 'app_id', 'app_name', 'app_dns', 'app_version', {},
-                                  stories, False, False, 'owner_uuid', 'example@example.com')
+        await Apps.deploy_release({}, 'app_id',
+                                  'app_name', 'app_dns', 'app_version', {},
+                                  stories, False, False, 'owner_uuid',
+                                  'example@example.com')
 
         TooManyActiveApps.__init__.assert_called_with(20, 5)
         Database.update_release_state.assert_called()
@@ -339,8 +349,10 @@ async def test_deploy_release_many_volumes(patch, async_mock):
     patch.object(Apps, 'get_services',
                  new=async_mock(return_value=stories['services']))
 
-    await Apps.deploy_release({}, 'app_id', 'app_name', 'app_dns', 'app_version', {},
-                              stories, False, False, 'owner_uuid', 'example@example.com')
+    await Apps.deploy_release({}, 'app_id', 'app_name',
+                              'app_dns', 'app_version', {},
+                              stories, False, False, 'owner_uuid',
+                              'example@example.com')
 
     TooManyVolumes.__init__.assert_called_with(20, 15)
     Database.update_release_state.assert_called()
@@ -373,7 +385,8 @@ async def test_deploy_release(config, magic, patch, deleted,
 
     await Apps.deploy_release(
         config, 'app_id', 'app_name', 'app_dns', 'version', 'env',
-        {'stories': True}, maintenance, deleted, 'owner_uuid', 'example@example.com')
+        {'stories': True}, maintenance, deleted,
+        'owner_uuid', 'example@example.com')
 
     if maintenance:
         assert Database.update_release_state.call_count == 0
@@ -387,9 +400,9 @@ async def test_deploy_release(config, magic, patch, deleted,
             app_logger, config, 'app_id', 'version', ReleaseState.DEPLOYING)
 
         App.__init__.assert_called_with(
-            'app_id', 'app_dns', 'version', config,
-            app_logger,
-            {'stories': True}, services, 'env', 'owner_uuid', 'example@example.com', app_config)
+            'app_id', 'app_name', 'app_dns', 'version', config, app_logger,
+            {'stories': True}, services, 'env', 'owner_uuid',
+            'example@example.com', app_config)
         App.bootstrap.mock.assert_called()
         Containers.init.mock.assert_called()
         if raise_exc is not None:

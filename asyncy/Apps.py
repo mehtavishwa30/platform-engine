@@ -68,10 +68,10 @@ class Apps:
         Database.update_release_state(logger, config, app_id, version,
                                       ReleaseState.DEPLOYING)
 
-        if environment is not None and config.USER_REPORTING_ENABLED is not False:
+        if environment is not None:
             # allow user based reporting in the engine. This makes it
             # possible for users to retrieve deploy errors
-            if "REPORTING_SLACK_WEBHOOK" in environment:
+            if "REPORTING_SLACK_WEBHOOK" in environment and config.USER_REPORTING_ENABLED is not False:
                 ExceptionReporter.init_app_agents(app_id, {
                     "slack_webhook": environment["REPORTING_SLACK_WEBHOOK"]
                 })

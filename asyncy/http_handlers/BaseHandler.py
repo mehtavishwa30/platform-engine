@@ -26,18 +26,22 @@ class BaseHandler(RequestHandler):
 
         app = Apps.get(app_id)
 
-        agent_options = {
-            'app_uuid': app_id,
-            'app_name': app.app_name,
-            'app_version': app.version,
-            'clever_ident': app.owner_email,
-            'clever_event': 'App Request Failure',
-            'allow_user_agents': True
-        }
-
         if isinstance(e, StoryscriptError):
-            ExceptionReporter.capture_exc(exc_info=e, story=e.story, line=e.line, agent_options=agent_options)
+            ExceptionReporter.capture_exc(exc_info=e, story=e.story, line=e.line, agent_options={
+                'clever_ident': app.owner_email,
+                'clever_event': 'App Request Failure',
+                'allow_user_agents': True
+            })
         else:
+            agent_options = {
+                'app_uuid': app_id,
+                'app_name': app.app_name,
+                'app_version': app.version,
+                'clever_ident': app.owner_email,
+                'clever_event': 'App Request Failure',
+                'allow_user_agents': True
+            }
+
             if story_name is None:
                 ExceptionReporter.capture_exc(exc_info=e, agent_options=agent_options)
             else:

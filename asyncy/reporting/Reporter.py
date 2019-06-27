@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import asyncio
+from asyncio import Future
 
 from .Agent import ReportingAgent
 from .. import Logger
@@ -127,12 +128,15 @@ class ExceptionReporter:
 
             default_agent_options.update(agent_options)
 
+        del default_agent_options['allow_user_agents']
+
         exc_data = {
             'story_name': story_name,
             'story_line': story_line,
             'app_name': app_name,
             'app_uuid': app_uuid,
-            'app_version': app_version
+            'app_version': app_version,
+            'platform_release': cls._release
         }
 
         if cls._sentry_agent is not None:
@@ -157,11 +161,11 @@ class ExceptionReporter:
                 logger.error(f'Unhandled CleverTap reporting agent error: {str(e)}', e)
 
         # this is disabled at the top level
-        if cls._config.get('user_report', False) is False:
+        if cls._config.get('user_reporting', False) is False:
             return
 
         # ensure that this exception should be pushed to users
-        if default_agent_options.get('allow_user_agents', False):
+        if agent_options is not None and agent_options.get('allow_user_agents', False):
             if app_uuid is not None and app_uuid in cls._app_agents:
                 app_agent_config = cls._app_agents[app_uuid]
                 if cls._slack_agent is not None and 'slack_webhook' in app_agent_config:
@@ -178,6 +182,4 @@ class ExceptionReporter:
                                                    exc_data=exc_data, agent_options=user_agent_options)
                     except Exception as e:
                         logger.error(f'Unhandled slack reporting agent error: {str(e)}', e)
-
-
 
