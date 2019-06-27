@@ -1,8 +1,34 @@
 # -*- coding: utf-8 -*-
 
 
-class StoryscriptError(Exception):
+class TooManyVolumes(Exception):
+    def __init__(self, volume_count, max_volumes):
+        super().__init__(
+            f'Your app makes use of {volume_count} volumes. '
+            f'The total permissible limit during Storyscript Beta is '
+            f'{max_volumes} volumes. Please see '
+            f'https://docs.storyscript.io/faq/ for more information.')
 
+
+class TooManyActiveApps(Exception):
+    def __init__(self, active_apps, max_apps):
+        super().__init__(
+            f'Only {max_apps} active apps are allowed during '
+            'Storyscript Beta. '
+            'Please see https://docs.storyscript.io/faq/ '
+            'for more information.')
+
+
+class TooManyServices(Exception):
+    def __init__(self, service_count, max_services):
+        super().__init__(
+            f'Your app makes use of {service_count} services. '
+            f'The total permissible limit during Storyscript Beta is '
+            f'{max_services} services. Please see '
+            f'https://docs.storyscript.io/faq/ for more information.')
+
+
+class StoryscriptError(Exception):
     def __init__(self, message=None, story=None, line=None, root_exc=None):
         super().__init__(message)
         self.message = message
@@ -36,35 +62,8 @@ class InvalidKeywordUsage(StoryscriptError):
 
 
 class ContainerSpecNotRegisteredError(StoryscriptError):
-    def __init__(self, container_name):
-        super().__init__(message=f'Service {container_name} not registered!')
-
-
-class TooManyVolumes(StoryscriptError):
-    def __init__(self, volume_count, max_volumes):
-        super().__init__(
-            message=f'Your app makes use of {volume_count} volumes. '
-                    f'The total permissible limit during Storyscript Beta is '
-                    f'{max_volumes} volumes. Please see '
-                    f'https://docs.storyscript.io/faq/ for more information.')
-
-
-class TooManyActiveApps(StoryscriptError):
-    def __init__(self, active_apps, max_apps):
-        super().__init__(
-            message=f'Only {max_apps} active apps are allowed during '
-            'Storyscript Beta. '
-            'Please see https://docs.storyscript.io/faq/ '
-            'for more information.')
-
-
-class TooManyServices(StoryscriptError):
-    def __init__(self, service_count, max_services):
-        super().__init__(
-            message=f'Your app makes use of {service_count} services. '
-                    f'The total permissible limit during Storyscript Beta is '
-                    f'{max_services} services. Please see '
-                    f'https://docs.storyscript.io/faq/ for more information.')
+    def __init__(self, container_name, story=None, line=None):
+        super().__init__(message=f'Service {container_name} not registered!', story=story, line=line)
 
 
 class ArgumentNotFoundError(StoryscriptError):
