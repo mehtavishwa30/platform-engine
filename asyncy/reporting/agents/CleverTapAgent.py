@@ -2,12 +2,12 @@ import json
 import time
 import traceback
 
-from asyncy import Logger
-from asyncy.Exceptions import StoryscriptError
-from asyncy.reporting.Agent import ReportingAgent
-from asyncy.utils.HttpUtils import HttpUtils
-
 from tornado.httpclient import AsyncHTTPClient
+
+from ..ReportingAgent import ReportingAgent
+from ...Exceptions import StoryscriptError
+from ...Logger import Logger
+from ...utils.HttpUtils import HttpUtils
 
 
 class CleverTapAgent(ReportingAgent):
