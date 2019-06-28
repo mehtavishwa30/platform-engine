@@ -18,7 +18,7 @@ from .Logger import Logger
 from .http_handlers.StoryEventHandler import StoryEventHandler
 from .processing.Services import Services
 from .processing.internal import File, Http, Json, Log
-from .reporting.Reporter import ExceptionReporter
+from .reporting.ExceptionReporter import ExceptionReporter
 
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24

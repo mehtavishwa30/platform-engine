@@ -3,7 +3,7 @@ import traceback
 
 from raven import Client
 
-from ..Agent import ReportingAgent
+from ..ReportingAgent import ReportingAgent
 from ...Exceptions import StoryscriptError
 from ...Logger import Logger
 
