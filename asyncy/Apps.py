@@ -72,7 +72,7 @@ class Apps:
 
         if environment is not None:
             # allow user based reporting in the engine. This makes it
-            # possible for users to retrieve deploy errors
+            # possible for users to retrieve deploy errors via slack
             if 'REPORTING_SLACK_WEBHOOK' in environment and \
                     config.USER_REPORTING_ENABLED is not False:
                 ExceptionReporter.init_app_agents(app_id, {
@@ -175,8 +175,7 @@ class Apps:
     @classmethod
     async def init_all(cls, release: str,
                        config: Config, glogger: Logger):
-        # we need to initialize the engine's exception reporter
-        # so we can handle reporting in an efficient manner
+        # initialize the engine's exception reporting system
         ExceptionReporter.init({
             'sentry_dsn': config.REPORTING_SENTRY_DSN,
             'slack_webhook': config.REPORTING_SLACK_WEBHOOK,
