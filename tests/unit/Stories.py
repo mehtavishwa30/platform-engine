@@ -17,6 +17,26 @@ def test_stories_init(app, logger, story):
     assert story.results == {}
 
 
+def test_new_frame(story):
+    with story.new_frame('10'):
+        current_stack = story.get_stack()
+        assert len(current_stack) == 1
+        assert current_stack[0] == '10'
+
+    current_stack = story.get_stack()
+    assert len(current_stack) == 0
+
+
+def test_new_frame_stack_does_not_unwind_on_exception(story):
+    try:
+        with story.new_frame('10'):
+            raise IOError()
+    except IOError:
+        current_stack = story.get_stack()
+        assert len(current_stack) == 1
+        assert current_stack[0] == '10'
+
+
 def test_stories_get_tmp_dir(story):
     story.execution_id = 'ex'
     assert story.get_tmp_dir() == '/tmp/story.ex'
