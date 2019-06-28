@@ -3,7 +3,7 @@ from tornado.web import RequestHandler
 
 from ..Apps import Apps
 from ..Exceptions import StoryscriptError
-from ..reporting.Reporter import ExceptionReporter
+from ..reporting.ExceptionReporter import ExceptionReporter
 
 
 class BaseHandler(RequestHandler):
@@ -21,7 +21,8 @@ class BaseHandler(RequestHandler):
             logger = self.logger
         logger.error(f'Story execution failed; cause={str(e)}', exc=e)
         self.set_status(500, 'Story execution failed')
-        self.finish()
+        if not self.is_finished():
+            self.finish()
 
         app = Apps.get(app_id)
 
