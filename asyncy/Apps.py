@@ -19,7 +19,7 @@ from .Logger import Logger
 from .constants.ServiceConstants import ServiceConstants
 from .db.Database import Database
 from .enums.ReleaseState import ReleaseState
-from .reporting.Reporter import ExceptionReporter
+from .reporting.ExceptionReporter import ExceptionReporter
 
 
 MAX_VOLUMES_BETA = 15

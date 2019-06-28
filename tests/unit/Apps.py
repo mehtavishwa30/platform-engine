@@ -19,7 +19,7 @@ from asyncy.constants.ServiceConstants import ServiceConstants
 from asyncy.db.Database import Database
 from asyncy.entities.Release import Release
 from asyncy.enums.ReleaseState import ReleaseState
-from asyncy.reporting.Reporter import ExceptionReporter
+from asyncy.reporting.ExceptionReporter import ExceptionReporter
 
 import psycopg2
 

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from asyncy.Apps import Apps
 from asyncy.Exceptions import StoryscriptError
 from asyncy.http_handlers.BaseHandler import BaseHandler
-from asyncy.reporting.Reporter import ExceptionReporter
+from asyncy.reporting.ExceptionReporter import ExceptionReporter
 
 from pytest import mark
 

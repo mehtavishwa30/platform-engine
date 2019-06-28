@@ -4,7 +4,7 @@ import traceback
 
 from tornado.httpclient import AsyncHTTPClient
 
-from ..Agent import ReportingAgent
+from ..ReportingAgent import ReportingAgent
 from ...Exceptions import StoryscriptError
 from ...Logger import Logger
 from ...utils.HttpUtils import HttpUtils

@@ -2,10 +2,10 @@
 import asyncio
 
 from asyncy.Exceptions import StoryscriptError
-from asyncy.reporting.Reporter import ExceptionReporter
-from asyncy.reporting.agents.CleverTap import CleverTapAgent
-from asyncy.reporting.agents.Sentry import SentryAgent
-from asyncy.reporting.agents.Slack import SlackAgent
+from asyncy.reporting.ExceptionReporter import ExceptionReporter
+from asyncy.reporting.agents.CleverTapAgent import CleverTapAgent
+from asyncy.reporting.agents.SentryAgent import SentryAgent
+from asyncy.reporting.agents.SlackAgent import SlackAgent
 
 import pytest
 

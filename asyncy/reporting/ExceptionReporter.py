@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import asyncio
 
-from .agents.CleverTap import CleverTapAgent
-from .agents.Sentry import SentryAgent
-from .agents.Slack import SlackAgent
+from .agents.CleverTapAgent import CleverTapAgent
+from .agents.SentryAgent import SentryAgent
+from .agents.SlackAgent import SlackAgent
 from .. import Logger
 from ..Exceptions import StoryscriptError
 from ..Stories import Stories
