@@ -14,6 +14,7 @@ from ..Apps import Apps
 from ..constants import ContextConstants
 from ..entities.Multipart import FileFormField
 from ..processing import Story
+from ..utils.Dict import Dict
 
 CLOUD_EVENTS_FILE_KEY = '_ce_payload'
 
@@ -96,7 +97,7 @@ class StoryEventHandler(BaseHandler):
 
         if payload.get('eventType') == 'http_request' \
                 and payload.get('source') == 'gateway':
-            headers = payload.get('data', {}).get('headers', None)
+            headers = Dict.find(payload, 'data.headers')
             if headers is not None:
                 headers = CaseInsensitiveDict(data=headers)
                 payload['data']['headers'] = headers

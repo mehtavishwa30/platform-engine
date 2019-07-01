@@ -3,7 +3,7 @@ import asyncio
 import json
 from collections import deque
 
-from asyncy.App import App
+from asyncy.App import App, AppData
 from asyncy.AppConfig import Expose
 from asyncy.Containers import Containers
 from asyncy.Exceptions import StoryscriptError
@@ -31,9 +31,20 @@ def exc(patch):
 
 @fixture
 def app(config, logger, magic):
-    return App('app_id', 'app_name', 'app_dns', logger, config, magic(),
-               magic(), magic(), {}, 'owner_uuid',
-               'example@example.com', magic())
+    return App(app_data=AppData(
+        app_id='app_id',
+        app_name='app_name',
+        app_dns='app_dns',
+        config=config,
+        logger=logger,
+        version=magic(),
+        stories=magic(),
+        services={},
+        owner_uuid='owner_uuid',
+        owner_email='example@example.com',
+        environment={},
+        app_config=magic()
+    ))
 
 
 def test_add_subscription(patch, app, magic):
@@ -132,9 +143,21 @@ def test_app_init(magic, config, logger, env):
     version = 100
     app_config = magic()
     config.APP_DOMAIN = 'asyncyapp.com'
-    app = App('app_id', 'app_name', 'app_dns', version, config, logger,
-              stories, services, env, 'owner_1',
-              'example@example.com', app_config)
+
+    app = App(app_data=AppData(
+        app_id='app_id',
+        app_name='app_name',
+        app_dns='app_dns',
+        version=version,
+        config=config,
+        logger=logger,
+        stories=stories,
+        services=services,
+        environment=env,
+        owner_uuid='owner_1',
+        owner_email='example@example.com',
+        app_config=app_config
+    ))
 
     if env is None:
         env = {}

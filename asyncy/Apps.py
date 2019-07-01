@@ -7,7 +7,7 @@ import threading
 
 import psycopg2
 
-from .App import App
+from .App import App, AppData
 from .AppConfig import AppConfig, KEY_EXPOSE
 from .Config import Config
 from .Containers import Containers
@@ -20,6 +20,7 @@ from .constants.ServiceConstants import ServiceConstants
 from .db.Database import Database
 from .enums.ReleaseState import ReleaseState
 from .reporting.ExceptionReporter import ExceptionReporter
+from .utils.Dict import Dict
 
 MAX_VOLUMES_BETA = 15
 MAX_SERVICES_BETA = 15
@@ -75,10 +76,10 @@ class Apps:
                 # allow user based reporting in the engine. This makes it
                 # possible for users to retrieve deploy errors via slack
                 if 'REPORTING_SLACK_WEBHOOK' in environment and \
-                        config.USER_REPORTING_ENABLED is not False:
-                    ExceptionReporter.init_app_agents(app_id, {
-                        'slack_webhook': environment['REPORTING_SLACK_WEBHOOK']
-                    })
+                    config.USER_REPORTING_ENABLED is not False:
+                        ExceptionReporter.init_app_agents(app_id, {
+                            'slack_webhook': environment['REPORTING_SLACK_WEBHOOK']
+                        })
             # Check for the currently active apps by the same owner.
             # Note: This is a super inefficient method, but is OK
             # since it'll last only during beta.
@@ -108,10 +109,20 @@ class Apps:
             app_config = cls.get_app_config(raw=stories.get('yaml', {}))
 
             app = App(
-                app_id, app_name, app_dns,
-                version, config, logger,
-                stories, services, environment,
-                owner_uuid, owner_email, app_config
+                app_data=AppData(
+                    app_id=app_id,
+                    app_name=app_name,
+                    app_dns=app_dns,
+                    version=version,
+                    config=config,
+                    logger=logger,
+                    stories=stories,
+                    services=services,
+                    environment=environment,
+                    owner_uuid=owner_uuid,
+                    owner_email=owner_email,
+                    app_config=app_config
+                )
             )
 
             await Containers.clean_app(app)
@@ -167,7 +178,7 @@ class Apps:
             ])
 
     @classmethod
-    async def init_all(cls, release: str,
+    async def init_all(cls, sentry_dsn: str, release: str,
                        config: Config, glogger: Logger):
         # initialize the engine's exception reporting system
         ExceptionReporter.init({
@@ -208,7 +219,7 @@ class Apps:
             all_services.append(expose_conf['service'])
 
         for service in all_services:
-            conf = asyncy_yaml.get('services', {}).get(service, {})
+            conf = Dict.find(asyncy_yaml, f'services.{service}', {})
             # query the Hub for the OMG
             tag = conf.get('tag', 'latest')
 

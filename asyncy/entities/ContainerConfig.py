@@ -2,7 +2,7 @@
 import typing
 
 ContainerConfig = typing.NamedTuple('ContainerConfig', [
-    ('name', bool),
+    ('name', str),
     ('data', dict),
 ])
 

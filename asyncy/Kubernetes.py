@@ -16,6 +16,7 @@ from .Exceptions import K8sError
 from .constants.ServiceConstants import ServiceConstants
 from .entities.ContainerConfig import ContainerConfig, ContainerConfigs
 from .entities.Volume import Volumes
+from .utils.Dict import Dict
 from .utils.HttpUtils import HttpUtils
 
 
@@ -348,7 +349,7 @@ class Kubernetes:
         if not inside_http:
             expose = service_config.get('expose', {})
             for name, expose_conf in expose.items():
-                expose_port = expose_conf.get('http', {}).get('port')
+                expose_port = Dict.find(expose_conf, 'http.port')
                 if expose_port is not None:
                     ports.add(expose_port)
 
@@ -470,12 +471,39 @@ class Kubernetes:
         body = json.loads(res.body, encoding='utf-8')
         for pod in body['items']:
             for container_status in pod['status'].get('containerStatuses', []):
-                is_waiting = container_status['state'].get('waiting', False)
+                is_waiting = Dict.find(container_status,
+                                       'state.waiting', False)
                 if is_waiting and is_waiting['reason'] in image_errors:
                     raise K8sError(
                         message=f'{is_waiting["reason"]} - '
                         f'Failed to pull image {container_status["image"]}'
                     )
+
+    @classmethod
+    def get_liveness_probe(cls, app, service: str):
+        """
+        livenessProbe: Indicates whether the Container is running.
+        If the liveness probe fails, the kubelet kills the Container,
+        and the Container is subjected to its restart policy.
+        If a Container does not provide a liveness probe,
+        the default state is Success.
+        """
+        omg = app.services[service][ServiceConstants.config]
+        health_check = Dict.find(omg, 'health.http')
+        if health_check is None:
+            return None
+        assert health_check.get('method', 'get') == 'get'
+        return {
+            'httpGet': {
+                'path': health_check['path'],
+                'port': health_check['port']
+            },
+            'initialDelaySeconds': 10,
+            'timeoutSeconds': 30,
+            'periodSeconds': 30,
+            'successThreshold': 1,
+            'failureThreshold': 5
+        }
 
     @classmethod
     async def create_deployment(cls, app, service_name: str, image: str,
@@ -532,6 +560,8 @@ class Kubernetes:
 
         b16_service_name = base64.b16encode(service_name.encode()).decode()
 
+        liveness_probe = cls.get_liveness_probe(app, service_name)
+
         payload = {
             'apiVersion': 'apps/v1',
             'kind': 'Deployment',
@@ -583,9 +613,13 @@ class Kubernetes:
             }
         }
 
+        container = payload['spec']['template']['spec']['containers'][0]
+
+        if liveness_probe is not None:
+            container['livenessProbe'] = liveness_probe
+
         if shutdown_command is not None:
-            payload['spec']['template']['spec']['containers'][0]['lifecycle'][
-                'preStop'] = {
+            container['lifecycle']['preStop'] = {
                 'exec': {
                     'command': shutdown_command
                 }

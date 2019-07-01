@@ -626,9 +626,22 @@ async def test_create_deployment(patch, async_mock, story):
         })
     ]
 
+    liveness_probe = {
+        'httpGet': {
+            'path': '/healthz',
+            'port': 8000
+        },
+        'initialDelaySeconds': 10,
+        'timeoutSeconds': 30,
+        'periodSeconds': 30,
+        'successThreshold': 1,
+        'failureThreshold': 5
+    }
+
     patch.object(Kubernetes, 'remove_volume', new=async_mock())
     patch.object(Kubernetes, 'create_volume', new=async_mock())
     patch.object(Kubernetes, 'create_imagepullsecret', new=async_mock())
+    patch.object(Kubernetes, 'get_liveness_probe', return_value=liveness_probe)
 
     b16_service_name = base64.b16encode('alpine'.encode()).decode()
 
@@ -688,7 +701,8 @@ async def test_create_deployment(patch, async_mock, story):
                                     'mountPath': volumes[1].mount_path,
                                     'name': volumes[1].name
                                 }
-                            ]
+                            ],
+                            'livenessProbe': liveness_probe
                         }
                     ],
                     'volumes': [
@@ -892,6 +906,43 @@ async def test_check_for_image_errors(patch, app, async_mock):
     Kubernetes.make_k8s_call.mock.assert_called_with(app.config, app.logger,
                                                      f'{prefix}/{app.app_id}'
                                                      f'/pods?{qs}')
+
+
+@mark.parametrize('service', [{
+    'name': 'first',
+    'configuration': {},
+    'liveness_probe': None
+}, {
+    'name': 'second',
+    'configuration': {
+        'health': {
+            'http': {
+                'method': 'get',
+                'path': '/healthz',
+                'port': 8000
+            }
+        }
+    },
+    'liveness_probe': {
+        'httpGet': {
+            'path': '/healthz',
+            'port': 8000
+        },
+        'initialDelaySeconds': 10,
+        'timeoutSeconds': 30,
+        'periodSeconds': 30,
+        'successThreshold': 1,
+        'failureThreshold': 5
+    }
+}])
+def test_get_liveness_probe(app, service):
+    app.services = {
+        service['name']: {
+            'configuration': service['configuration']
+        }
+    }
+    liveness_probe = Kubernetes.get_liveness_probe(app, service['name'])
+    assert liveness_probe == service['liveness_probe']
 
 
 def test_is_2xx():

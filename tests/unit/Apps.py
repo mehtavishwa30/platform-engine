@@ -6,7 +6,7 @@ import signal
 from threading import Thread
 from unittest import mock
 
-from asyncy.App import App
+from asyncy.App import App, AppData
 from asyncy.AppConfig import AppConfig
 from asyncy.Apps import Apps
 from asyncy.Containers import Containers
@@ -406,12 +406,20 @@ async def test_deploy_release(config, magic, patch, deleted,
         assert Database.update_release_state.mock_calls[0] == mock.call(
             app_logger, config, 'app_id', 'version', ReleaseState.DEPLOYING)
 
-        App.__init__.assert_called_with(
-            'app_id', 'app_name', 'app_dns',
-            'version', config, app_logger,
-            {'stories': True}, services,
-            'env', 'owner_uuid',
-            'example@example.com', app_config)
+        App.__init__.assert_called_with(app_data=AppData(
+            app_id='app_id',
+            app_name='app_name',
+            app_dns='app_dns',
+            version='version',
+            config=config,
+            logger=app_logger,
+            stories={'stories': True},
+            services=services,
+            environment='env',
+            owner_uuid='owner_uuid',
+            owner_email='example@example.com',
+            app_config=app_config
+        ))
 
         App.bootstrap.mock.assert_called()
         Containers.init.mock.assert_called()
