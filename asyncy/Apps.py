@@ -76,10 +76,10 @@ class Apps:
                 # allow user based reporting in the engine. This makes it
                 # possible for users to retrieve deploy errors via slack
                 if 'REPORTING_SLACK_WEBHOOK' in environment and \
-                    config.USER_REPORTING_ENABLED is not False:
-                        ExceptionReporter.init_app_agents(app_id, {
-                            'slack_webhook': environment['REPORTING_SLACK_WEBHOOK']
-                        })
+                        config.USER_REPORTING_ENABLED is not False:
+                    ExceptionReporter.init_app_agents(app_id, {
+                        'slack_webhook': environment['REPORTING_SLACK_WEBHOOK']
+                    })
             # Check for the currently active apps by the same owner.
             # Note: This is a super inefficient method, but is OK
             # since it'll last only during beta.
@@ -178,7 +178,7 @@ class Apps:
             ])
 
     @classmethod
-    async def init_all(cls, sentry_dsn: str, release: str,
+    async def init_all(cls, release: str,
                        config: Config, glogger: Logger):
         # initialize the engine's exception reporting system
         ExceptionReporter.init({
