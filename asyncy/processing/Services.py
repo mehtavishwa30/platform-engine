@@ -14,22 +14,16 @@ import ujson
 from ..Containers import Containers
 from ..Exceptions import ArgumentTypeMismatchError, StoryscriptError
 from ..Logger import Logger
-from ..Types import StreamingService
+from ..Types import Command, Event, InternalCommand, \
+    InternalService, Service, StreamingService
 from ..constants.ContextConstants import ContextConstants
 from ..constants.LineConstants import LineConstants
 from ..constants.ServiceConstants import ServiceConstants
 from ..entities.Multipart import FileFormField, FormField
+from ..omg.ServiceOutputValidator import ServiceOutputValidator
 from ..utils import Dict
 from ..utils.HttpUtils import HttpUtils
 from ..utils.StringUtils import StringUtils
-
-InternalCommand = namedtuple('InternalCommand',
-                             ['arguments', 'output_type', 'handler'])
-InternalService = namedtuple('InternalService', ['commands'])
-
-Service = namedtuple('Service', ['name'])
-Command = namedtuple('Command', ['name'])
-Event = namedtuple('Event', ['name'])
 
 
 class Services:
@@ -441,7 +435,18 @@ class Services:
         if int(response.code / 100) == 2:
             content_type = response.headers.get('Content-Type')
             if content_type and 'application/json' in content_type:
-                return ujson.loads(response.body)
+                try:
+                    body = ujson.loads(response.body)
+                except TypeError:
+                    raise StoryscriptError(
+                        message=f'Failed to parse service output as JSON!'
+                        f' Response body is {body}.',
+                        story=story, line=line)
+
+                expected_service_output = command_conf.get('output')
+                ServiceOutputValidator.raise_if_invalid(
+                    expected_service_output, body, chain)
+                return body
             else:
                 return cls.parse_output(command_conf, response.body,
                                         story, line, content_type)

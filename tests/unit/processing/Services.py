@@ -279,6 +279,13 @@ async def test_services_execute_http(patch, story, async_mock,
             'foo': {
                 'in': location
             }
+        },
+        'output': {
+            'properties': {
+                'foo': {
+                    'type': 'string'
+                }
+            }
         }
     }
 
