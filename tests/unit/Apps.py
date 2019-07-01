@@ -367,10 +367,21 @@ async def test_deploy_release_many_volumes(patch, async_mock):
 @mark.parametrize('raise_exc', [None, exc, asyncy_exc])
 @mark.parametrize('maintenance', [True, False])
 @mark.parametrize('deleted', [True, False])
+@mark.parametrize(
+    'environment',
+    [
+        None,
+        {
+            'REPORTING_SLACK_WEBHOOK': 'http://example.com/'
+        }
+    ]
+)
 @mark.asyncio
 async def test_deploy_release(config, magic, patch, deleted,
+                              environment,
                               async_mock, raise_exc, maintenance):
     patch.object(ExceptionReporter, 'capture_exc')
+    patch.object(ExceptionReporter, 'init_app_agents')
     patch.object(Kubernetes, 'clean_namespace', new=async_mock())
     patch.object(Containers, 'init', new=async_mock())
     patch.object(Database, 'update_release_state')
@@ -390,9 +401,10 @@ async def test_deploy_release(config, magic, patch, deleted,
         patch.object(App, 'bootstrap', new=async_mock())
 
     await Apps.deploy_release(
-        config, 'app_id', 'app_name', 'app_dns', 'version', 'env',
-        {'stories': True}, maintenance, deleted,
-        'owner_uuid', 'example@example.com'
+        config, 'app_id', 'app_name', 'app_dns',
+        'version', environment, {'stories': True},
+        maintenance, deleted, 'owner_uuid',
+        'example@example.com'
     )
 
     if maintenance:
@@ -415,7 +427,7 @@ async def test_deploy_release(config, magic, patch, deleted,
             logger=app_logger,
             stories={'stories': True},
             services=services,
-            environment='env',
+            environment=environment,
             owner_uuid='owner_uuid',
             owner_email='example@example.com',
             app_config=app_config
@@ -423,6 +435,13 @@ async def test_deploy_release(config, magic, patch, deleted,
 
         App.bootstrap.mock.assert_called()
         Containers.init.mock.assert_called()
+
+        if environment is not None and \
+                'REPORTING_SLACK_WEBHOOK' in environment:
+            ExceptionReporter.init_app_agents.assert_called_with('app_id', {
+                'slack_webhook': environment['REPORTING_SLACK_WEBHOOK']
+            })
+
         if raise_exc is not None:
             assert Apps.apps.get('app_id') is None
             if raise_exc == exc:
