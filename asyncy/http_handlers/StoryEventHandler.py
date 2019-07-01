@@ -40,15 +40,10 @@ class StoryEventHandler(BaseHandler):
                               content_type=tf.content_type)
             event_body.setdefault('data', {})[key] = f
 
-        try:
-            await Story.run(app, app.logger,
-                            story_name=story_name,
-                            context=context,
-                            block=block)
-            return True
-        except BaseException as e:
-            app.logger.error('Failed to execute story', e)
-            return False
+        await Story.run(app, app.logger,
+                        story_name=story_name,
+                        context=context,
+                        block=block)
 
     async def post(self):
         start = time.time()
@@ -61,12 +56,9 @@ class StoryEventHandler(BaseHandler):
             self.logger.info(f'Running story for {app_id}: '
                              f'{story_name} @ {block} for '
                              f'event {event_body}')
-            success = await self.run_story(app_id, story_name, block,
-                                           event_body)
 
-            if not success:
-                self.set_status(500)
-                self.finish()
+            await self.run_story(app_id, story_name, block,
+                                 event_body)
 
             if not self.is_finished():
                 self.set_status(200)

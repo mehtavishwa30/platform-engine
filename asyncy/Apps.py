@@ -16,10 +16,10 @@ from .Exceptions import StoryscriptError, TooManyActiveApps, TooManyServices, \
     TooManyVolumes
 from .GraphQLAPI import GraphQLAPI
 from .Logger import Logger
-from .Sentry import Sentry
 from .constants.ServiceConstants import ServiceConstants
 from .db.Database import Database
 from .enums.ReleaseState import ReleaseState
+from .reporting.ExceptionReporter import ExceptionReporter
 
 MAX_VOLUMES_BETA = 15
 MAX_SERVICES_BETA = 15
@@ -71,6 +71,14 @@ class Apps:
                                       ReleaseState.DEPLOYING)
 
         try:
+            if environment is not None:
+                # allow user based reporting in the engine. This makes it
+                # possible for users to retrieve deploy errors via slack
+                if 'REPORTING_SLACK_WEBHOOK' in environment and \
+                        config.USER_REPORTING_ENABLED is not False:
+                    ExceptionReporter.init_app_agents(app_id, {
+                        'slack_webhook': environment['REPORTING_SLACK_WEBHOOK']
+                    })
             # Check for the currently active apps by the same owner.
             # Note: This is a super inefficient method, but is OK
             # since it'll last only during beta.
@@ -112,18 +120,29 @@ class Apps:
             await app.bootstrap()
 
             cls.apps[app_id] = app
-            Database.update_release_state(logger, config, app_id, version,
-                                          ReleaseState.DEPLOYED)
+            Database.update_release_state(
+                logger, config, app_id, version,
+                ReleaseState.DEPLOYED
+            )
 
             logger.info(f'Successfully deployed app {app_id}@{version}')
         except BaseException as e:
-            Database.update_release_state(logger, config, app_id, version,
-                                          ReleaseState.FAILED)
-            if isinstance(e, StoryscriptError):
-                logger.error(str(e))
-            else:
-                logger.error(f'Failed to bootstrap app ({e})', exc=e)
-                Sentry.capture_exc(e)
+            Database.update_release_state(
+                logger, config,
+                app_id, version,
+                ReleaseState.FAILED
+            )
+
+            ExceptionReporter.capture_exc(
+                exc_info=e, agent_options={
+                    'app_name': app_name,
+                    'app_uuid': app_id,
+                    'app_version': version,
+                    'clever_ident': owner_email,
+                    'clever_event': 'App Deploy Failed',
+                    'allow_user_agents': True
+                }
+            )
 
     @classmethod
     def make_logger_for_app(cls, config, app_id, version):
@@ -148,9 +167,19 @@ class Apps:
             ])
 
     @classmethod
-    async def init_all(cls, sentry_dsn: str, release: str,
+    async def init_all(cls, release: str,
                        config: Config, glogger: Logger):
-        Sentry.init(sentry_dsn, release)
+        # initialize the engine's exception reporting system
+        ExceptionReporter.init({
+            'sentry_dsn': config.REPORTING_SENTRY_DSN,
+            'slack_webhook': config.REPORTING_SLACK_WEBHOOK,
+            'clevertap_config': {
+                'account': config.REPORTING_CLEVERTAP_ACCOUNT,
+                'pass': config.REPORTING_CLEVERTAP_PASS
+            },
+            'user_reporting': config.USER_REPORTING_ENABLED,
+            'user_reporting_stacktrace': config.USER_REPORTING_STACKTRACE
+        }, release, glogger)
 
         # We must start listening for releases straight away,
         # before an app is even deployed.
@@ -241,7 +270,7 @@ class Apps:
                                   update_db_state=True)
 
         can_deploy = False
-
+        release = None
         try:
             can_deploy = await cls.deployment_lock.try_acquire(app_id)
             if not can_deploy:
@@ -272,13 +301,21 @@ class Apps:
         except BaseException as e:
             glogger.error(
                 f'Failed to reload app {app_id}', exc=e)
-            Sentry.capture_exc(exc_info=e)
-            if isinstance(e, asyncio.TimeoutError):
-                logger = cls.make_logger_for_app(config, app_id,
-                                                 release.version)
-                Database.update_release_state(logger, config, app_id,
-                                              release.version,
-                                              ReleaseState.TIMED_OUT)
+            if release is not None:
+                ExceptionReporter.capture_exc(exc_info=e, agent_options={
+                    'app_name': release.app_name,
+                    'app_uuid': release.app_uuid,
+                    'app_version': release.version,
+                    'clever_ident': release.owner_email,
+                    'clever_event': 'App Reload Failed'
+                })
+
+                if isinstance(e, asyncio.TimeoutError):
+                    logger = cls.make_logger_for_app(config, app_id,
+                                                     release.version)
+                    Database.update_release_state(logger, config, app_id,
+                                                  release.version,
+                                                  ReleaseState.TIMED_OUT)
         finally:
             if can_deploy:
                 # If we did acquire the lock, then we must release it.
@@ -291,7 +328,11 @@ class Apps:
             try:
                 await cls.destroy_app(app)
             except BaseException as e:
-                Sentry.capture_exc(e)
+                ExceptionReporter.capture_exc(exc_info=e, agent_options={
+                    'app_name': app.app_name,
+                    'app_uuid': app.app_id,
+                    'app_version': app.version
+                })
 
     @classmethod
     def listen_to_releases(cls, config: Config, glogger: Logger, loop):

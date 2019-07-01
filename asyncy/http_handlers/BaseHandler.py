@@ -2,12 +2,10 @@
 from tornado.web import RequestHandler
 
 from ..Apps import Apps
-from ..Exceptions import StoryscriptError
-from ..Sentry import Sentry
+from ..reporting.ExceptionReporter import ExceptionReporter
 
 
 class BaseHandler(RequestHandler):
-
     logger = None
 
     # noinspection PyMethodOverriding
@@ -22,16 +20,27 @@ class BaseHandler(RequestHandler):
             logger = self.logger
         logger.error(f'Story execution failed; cause={str(e)}', exc=e)
         self.set_status(500, 'Story execution failed')
-        self.finish()
-        if isinstance(e, StoryscriptError):
-            Sentry.capture_exc(e, e.story, e.line)
+        if not self.is_finished():
+            self.finish()
+
+        app = Apps.get(app_id)
+
+        agent_options = {
+            'app_uuid': app_id,
+            'app_name': app.app_name,
+            'app_version': app.version,
+            'clever_ident': app.owner_email,
+            'clever_event': 'App Request Failure',
+            'allow_user_agents': True
+        }
+
+        if story_name is None:
+            ExceptionReporter.capture_exc(
+                exc_info=e, agent_options=agent_options)
         else:
-            if story_name is None:
-                Sentry.capture_exc(e)
-            else:
-                Sentry.capture_exc(e, extra={
-                    'story_name': story_name
-                })
+            agent_options['story_name'] = story_name
+            ExceptionReporter.capture_exc(
+                exc_info=e, agent_options=agent_options)
 
     def is_finished(self):
         return self._finished

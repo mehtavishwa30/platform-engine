@@ -15,11 +15,11 @@ from asyncy.Exceptions import StoryscriptError, TooManyActiveApps, \
 from asyncy.GraphQLAPI import GraphQLAPI
 from asyncy.Kubernetes import Kubernetes
 from asyncy.Logger import Logger
-from asyncy.Sentry import Sentry
 from asyncy.constants.ServiceConstants import ServiceConstants
 from asyncy.db.Database import Database
 from asyncy.entities.Release import Release
 from asyncy.enums.ReleaseState import ReleaseState
+from asyncy.reporting.ExceptionReporter import ExceptionReporter
 
 import psycopg2
 
@@ -102,7 +102,7 @@ async def test_destroy_all(patch, async_mock, magic):
 @mark.asyncio
 async def test_destroy_all_exc(patch, async_mock, magic):
     app = magic()
-    patch.object(Sentry, 'capture_exc')
+    patch.object(ExceptionReporter, 'capture_exc')
 
     err = BaseException()
 
@@ -112,15 +112,21 @@ async def test_destroy_all_exc(patch, async_mock, magic):
     app.destroy = exc
     Apps.apps = {'app_id': app}
     app.app_id = 'app_id'
+    app.app_name = 'app_name'
     await Apps.destroy_all()
 
-    Sentry.capture_exc.assert_called_with(err)
+    ExceptionReporter.capture_exc.assert_called_with(
+        exc_info=err, agent_options={
+            'app_uuid': app.app_id,
+            'app_version': app.version,
+            'app_name': app.app_name
+        })
 
 
 @mark.asyncio
 async def test_init_all(patch, magic, async_mock, config, logger, db):
     db()
-    patch.object(Sentry, 'init')
+    patch.object(ExceptionReporter, 'init')
     patch.init(Thread)
     patch.object(Thread, 'start')
 
@@ -131,11 +137,20 @@ async def test_init_all(patch, magic, async_mock, config, logger, db):
                  return_value=apps)
     patch.object(Apps, 'reload_app', new=async_mock())
 
-    await Apps.init_all('sentry_dsn', 'release_ver', config, logger)
+    await Apps.init_all('release_ver', config, logger)
     Apps.reload_app.mock.assert_called_with(
         config, logger, 'my_app_uuid')
 
-    Sentry.init.assert_called_with('sentry_dsn', 'release_ver')
+    ExceptionReporter.init.assert_called_with({
+        'sentry_dsn': config.REPORTING_SENTRY_DSN,
+        'slack_webhook': config.REPORTING_SLACK_WEBHOOK,
+        'clevertap_config': {
+            'account': config.REPORTING_CLEVERTAP_ACCOUNT,
+            'pass': config.REPORTING_CLEVERTAP_PASS
+        },
+        'user_reporting': config.USER_REPORTING_ENABLED,
+        'user_reporting_stacktrace': config.USER_REPORTING_STACKTRACE
+    }, 'release_ver', logger)
 
     loop = asyncio.get_event_loop()
     Thread.__init__.assert_called_with(target=Apps.listen_to_releases,
@@ -201,7 +216,7 @@ async def test_reload_app(patch, config, logger, db, async_mock,
     app_name = 'app_name'
     app_dns = 'app_dns'
     Apps.apps = {app_id: old_app}
-    patch.object(Sentry, 'capture_exc')
+    patch.object(ExceptionReporter, 'capture_exc')
     app_logger = magic()
     patch.object(Apps, 'make_logger_for_app', return_value=app_logger)
     patch.object(Database, 'update_release_state')
@@ -247,7 +262,7 @@ async def test_reload_app(patch, config, logger, db, async_mock,
 
     if raise_exc:
         logger.error.assert_called()
-        Sentry.capture_exc.assert_called()
+        ExceptionReporter.capture_exc.assert_called()
     else:
         logger.error.assert_not_called()
 
@@ -355,7 +370,7 @@ async def test_deploy_release_many_volumes(patch, async_mock):
 @mark.asyncio
 async def test_deploy_release(config, magic, patch, deleted,
                               async_mock, raise_exc, maintenance):
-    patch.object(Sentry, 'capture_exc')
+    patch.object(ExceptionReporter, 'capture_exc')
     patch.object(Kubernetes, 'clean_namespace', new=async_mock())
     patch.object(Containers, 'init', new=async_mock())
     patch.object(Database, 'update_release_state')
@@ -403,7 +418,7 @@ async def test_deploy_release(config, magic, patch, deleted,
         if raise_exc is not None:
             assert Apps.apps.get('app_id') is None
             if raise_exc == exc:
-                Sentry.capture_exc.assert_called()
+                ExceptionReporter.capture_exc.assert_called()
             assert Database.update_release_state.mock_calls[1] == mock.call(
                 app_logger, config, 'app_id', 'version', ReleaseState.FAILED)
         else:

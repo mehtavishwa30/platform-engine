@@ -41,7 +41,6 @@ class App:
                  stories: dict, services: dict, environment: dict,
                  owner_uuid: str, owner_email: typing.Union[str, None],
                  app_config: AppConfig):
-
         self._subscriptions = {}
         self.app_id = app_id
         self.app_name = app_name

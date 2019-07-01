@@ -24,6 +24,12 @@ def test_config():
     assert Config.defaults['ASYNCY_SYNAPSE_HOST'] == 'synapse'
     assert Config.defaults['ASYNCY_SYNAPSE_PORT'] == 80
     assert Config.defaults['ASYNCY_HTTP_GW_HOST'] == 'gateway'
+    assert Config.defaults['REPORTING_SENTRY_DSN'] is None
+    assert Config.defaults['REPORTING_SLACK_WEBHOOK'] is None
+    assert Config.defaults['REPORTING_CLEVERTAP_ACCOUNT'] is None
+    assert Config.defaults['REPORTING_CLEVERTAP_PASS'] is None
+    assert Config.defaults['USER_REPORTING_ENABLED'] is False
+    assert Config.defaults['USER_REPORTING_STACKTRACE'] is False
 
 
 def test_config_init(patch):

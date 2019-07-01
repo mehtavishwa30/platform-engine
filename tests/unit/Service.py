@@ -41,11 +41,12 @@ async def test_init_wrapper(patch, async_mock):
     import asyncy.Service as ServiceFile
     ServiceFile.config = MagicMock()
     ServiceFile.logger = MagicMock()
-    sentry = 'sentry_dsn'
     release = 'release_ver'
-    await Service.init_wrapper(sentry, release)
+    await Service.init_wrapper(release)
     Apps.init_all.mock.assert_called_with(
-        sentry, release, ServiceFile.config, ServiceFile.logger)
+        release, ServiceFile.config,
+        ServiceFile.logger
+    )
 
 
 @mark.asyncio
@@ -55,14 +56,14 @@ async def test_init_wrapper_exc(patch, async_mock, magic):
 
     patch.object(Apps, 'init_all', new=async_mock(side_effect=exc))
     patch.object(sys, 'exit')
-    await Service.init_wrapper(magic(), magic())
+    await Service.init_wrapper(magic())
     sys.exit.assert_called()
 
 
 def test_service_sig_handler(patch):
     patch.object(tornado, 'ioloop')
     Service.sig_handler(15)
-    tornado.ioloop.IOLoop.instance()\
+    tornado.ioloop.IOLoop.instance() \
         .add_callback.assert_called_with(Service.shutdown)
 
 
@@ -72,7 +73,7 @@ def test_service_shutdown(patch):
     patch.object(asyncio, 'get_event_loop')
     patch.object(Service, 'shutdown_app')
     Service.shutdown()
-    asyncio.get_event_loop().create_task\
+    asyncio.get_event_loop().create_task \
         .assert_called_with(Service.shutdown_app())
 
 
