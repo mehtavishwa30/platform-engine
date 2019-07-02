@@ -373,7 +373,7 @@ async def test_clear_subscriptions_synapse(patch, app, async_mock,
     app.config.ASYNCY_SYNAPSE_PORT = 9000
 
     expected_url = f'http://{app.config.ASYNCY_SYNAPSE_HOST}:' \
-        f'{app.config.ASYNCY_SYNAPSE_PORT}/clear_all'
+                   f'{app.config.ASYNCY_SYNAPSE_PORT}/clear_all'
 
     expected_kwargs = {
         'method': 'POST',
