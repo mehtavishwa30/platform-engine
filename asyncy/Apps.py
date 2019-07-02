@@ -19,6 +19,7 @@ from .Logger import Logger
 from .Sentry import Sentry
 from .constants.ServiceConstants import ServiceConstants
 from .db.Database import Database
+from .entities.Release import Release
 from .enums.ReleaseState import ReleaseState
 from .utils.Dict import Dict
 
@@ -47,10 +48,17 @@ class Apps:
         return AppConfig(raw)
 
     @classmethod
-    async def deploy_release(cls, config, app_id, app_name, app_dns,
-                             version, environment, stories,
-                             maintenance: bool, always_pull_images: bool,
-                             deleted: bool, owner_uuid, owner_email):
+    async def deploy_release(cls, config: Config, release: Release):
+        app_id = release.app_uuid
+        app_name = release.app_name
+        app_dns = release.app_dns
+        version = release.version
+        stories = release.stories
+        maintenance = release.maintenance
+        deleted = release.deleted
+        owner_uuid = release.owner_uuid
+        owner_email = release.owner_email
+
         logger = cls.make_logger_for_app(config, app_id, version)
         logger.info(f'Deploying app {app_id}@{version}')
 
@@ -109,8 +117,8 @@ class Apps:
                     logger=logger,
                     stories=stories,
                     services=services,
-                    always_pull_images=always_pull_images,
-                    environment=environment,
+                    always_pull_images=release.always_pull_images,
+                    environment=release.environment,
                     owner_uuid=owner_uuid,
                     owner_email=owner_email,
                     app_config=app_config
@@ -273,12 +281,9 @@ class Apps:
                 return
             await asyncio.wait_for(
                 cls.deploy_release(
-                    config, app_id, release.app_name,
-                    release.app_dns, release.version,
-                    release.environment, release.stories,
-                    release.maintenance, release.always_pull_images,
-                    release.deleted, release.owner_uuid,
-                    release.owner_email),
+                    config=config,
+                    release=release
+                ),
                 timeout=5 * 60)
             glogger.info(f'Reloaded app {app_id}@{release.version}')
         except BaseException as e:

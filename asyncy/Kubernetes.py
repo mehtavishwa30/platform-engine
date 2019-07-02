@@ -34,8 +34,7 @@ class Kubernetes:
         path = res.request.url
         raise K8sError(message=f'Failed to call {path}! '
                                f'code={res.code}; body={res.body}; '
-                               f'error={res.error}'
-                       )
+                               f'error={res.error}')
 
     @classmethod
     async def create_ingress(cls, ingress_name, app, expose: Expose,
@@ -433,7 +432,7 @@ class Kubernetes:
         if not cls.is_2xx(res):
             raise K8sError(
                 message=f'Failed to create imagePullSecret {config["name"]} '
-                f'in namespace {app.app_id}!')
+                        f'in namespace {app.app_id}!')
 
     @classmethod
     async def wait_for_port(cls, host, port):
@@ -561,8 +560,10 @@ class Kubernetes:
 
         b16_service_name = base64.b16encode(service_name.encode()).decode()
 
-        image_pull_policy = 'Always' if app.always_pull_images \
-            else 'IfNotPresent'
+        if app.always_pull_images is True:
+            image_pull_policy = 'Always'
+        else:
+            image_pull_policy = 'IfNotPresent'
 
         app.logger.debug(f'imagePullPolicy set to {image_pull_policy}')
 

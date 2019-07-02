@@ -682,7 +682,7 @@ async def test_create_deployment(patch, async_mock, story):
                                 }
                             },
                             'command': start_command,
-                            'imagePullPolicy': 'Always',
+                            'imagePullPolicy': 'IfNotPresent',
                             'env': [{'name': 'token', 'value': 'asyncy-19920'},
                                     {'name': 'username', 'value': 'asyncy'}],
                             'lifecycle': {
