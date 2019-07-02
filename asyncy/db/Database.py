@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
-from statistics import mean
-
 from asyncy.Config import Config
 from asyncy.db.SimpleConnCursor import SimpleConnCursor
 from asyncy.entities.ContainerConfig import ContainerConfig
 from asyncy.entities.Release import Release
 from asyncy.enums.ReleaseState import ReleaseState
 
+import numpy as np
+
 import psycopg2
+from psycopg2.extras import execute_values
 
 
 class Database:
-
-    METRICS_SIZE = 25
 
     @classmethod
     def new_pg_conn(cls, config: Config):
@@ -56,7 +55,7 @@ class Database:
             )
             select name, containerconfig
             from containerconfigs
-            where owner_uuid = %s and registry = %s
+            where owner_uuid = %s and registry = %s;
             """
             db.cur.execute(query, (app.owner_uuid, registry_url))
             data = db.cur.fetchall()
@@ -117,50 +116,42 @@ class Database:
             return db.cur.fetchall()
 
     @classmethod
-    def get_service_usage(cls, config: Config, service):
-        """
-        Returns { cpu_units: [...], memory_bytes: [...] }
-        """
+    def create_service_usage(cls, config: Config, data):
         with cls.new_pg_cur(config) as db:
             query = """
-            select cpu_units, memory_bytes
-            from service_usage
-            where service_uuid = %s;
+            insert into service_usage (service_uuid, tag)
+            values %s on conflict (service_uuid, tag) do nothing;
             """
-            db.cur.execute(query, (service['uuid'],))
-            res = db.cur.fetchone()
-            if res is None:
-                query = """
-                insert into service_usage
-                (service_uuid) values (%s)
-                returning cpu_units, memory_bytes;
-                """
-                db.cur.execute(query, (service['uuid'],))
-                db.conn.commit()
-                res = db.cur.fetchone()
-            return res
+            execute_values(db.cur, query, [
+                (s['service_uuid'], s['tag']) for s in data
+            ])
+            db.conn.commit()
 
     @classmethod
-    def update_service_usage(cls, config: Config, service, data):
-
-        # Store only the last ${METRICS_SIZE} metrics
-        data.update((k, v[-cls.METRICS_SIZE:]) for k, v in data.items())
+    def update_service_usage(cls, config: Config, data):
 
         with cls.new_pg_cur(config) as db:
-            query = """
+            query1 = """
             update service_usage
-            set cpu_units = %s, memory_bytes = %s
-            where service_uuid = %s;
+            set cpu_units[next_index] = %(cpu_units)s,
+            memory_bytes[next_index] = %(memory_bytes)s
+            where service_uuid = %(service_uuid)s and tag = %(tag)s;
             """
-            db.cur.execute(query, (data['cpu_units'], data['memory_bytes'],
-                                   service['uuid']))
+            query2 = """
+            update service_usage
+            set next_index = next_index %% 25 + 1
+            where service_uuid = %(service_uuid)s and tag = %(tag)s;
+            """
+            for record in data:
+                db.cur.execute(query1, record)
+                db.cur.execute(query2, record)
             db.conn.commit()
 
     @classmethod
     def get_service_by_alias(cls, config: Config, service_alias: str):
         with cls.new_pg_cur(config) as db:
             query = """
-            select uuid from services where alias = %s
+            select uuid from services where alias = %s;
             """
             db.cur.execute(query, (service_alias,))
             return db.cur.fetchone()
@@ -172,13 +163,13 @@ class Database:
             query = """
             select services.uuid from services
             join owners on owner_uuid = owners.uuid
-            where owners.username = %s and services.name = %s
+            where owners.username = %s and services.name = %s;
             """
             db.cur.execute(query, (owner_username, service_name))
             return db.cur.fetchone()
 
     @classmethod
-    def get_service_limits(cls, config: Config, service: str):
+    def get_service_limits(cls, config: Config, service: str, tag: str):
         if '/' in service:
             owner_username, service_name = service.split('/')
             service = cls.get_service_by_slug(config,
@@ -190,18 +181,21 @@ class Database:
             query = """
             select cpu_units, memory_bytes
             from service_usage
-            where service_uuid = %s
+            where service_uuid = %s and tag = %s;
             """
-            db.cur.execute(query, (service['uuid'],))
+            db.cur.execute(query, (service['uuid'], tag))
             res = db.cur.fetchone()
-            if res is None or len(res['cpu_units']) < cls.METRICS_SIZE:
+            if res is None or -1 in res['cpu_units']:
                 limits = {
-                    'cpu': '0',
-                    'memory': '200Mi'
+                    'cpu': 0,
+                    'memory': 209715000  # 200Mi
                 }
             else:
                 limits = {
-                    'cpu': 1.25 * mean(res['cpu_units']),
-                    'memory': 1.25 * mean(res['memory_bytes'])
+                    'cpu': 1.25 * np.percentile(res['cpu_units'], 95),
+                    'memory': min(
+                        209715000,  # 200Mi
+                        1.25 * np.percentile(res['memory_bytes'], 95)
+                    )
                 }
             return limits

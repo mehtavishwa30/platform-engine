@@ -48,7 +48,7 @@ def test_get_container_configs(patch, magic, config, database):
             )
             select name, containerconfig
             from containerconfigs
-            where owner_uuid = %s and registry = %s
+            where owner_uuid = %s and registry = %s;
             """
 
     patch.object(database.cur, 'fetchall', return_value=[

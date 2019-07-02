@@ -2,7 +2,11 @@ import asyncio
 import base64
 import json
 import urllib.parse
+from collections import defaultdict
+from operator import truediv
 from typing import Dict, List, Tuple, Union
+
+import numpy as np
 
 from .Config import Config
 from .Exceptions import K8sError
@@ -14,6 +18,7 @@ from .db.Database import Database
 class ServiceUsage:
 
     WAIT_PERIOD = 5 * 60
+    BATCH_SIZE = 100
 
     @classmethod
     def get_service_labels(cls, service) -> List[str]:
@@ -71,17 +76,29 @@ class ServiceUsage:
         return base * multipliers[suffix]
 
     @classmethod
+    async def get_pod_image_tag(cls, config, logger, pod):
+        prefix = Kubernetes._get_api_path_prefix('pods')
+        namespace = pod['metadata']['namespace']
+        name = pod['metadata']['name']
+        res = await Kubernetes.make_k8s_call(config, logger,
+                                             f'{prefix}/{namespace}'
+                                             f'/pods/{name}')
+        Kubernetes.raise_if_not_2xx(res)
+        body = json.loads(res.body, encoding='utf-8')
+        return body['spec']['containers'][0]['image'].split(':')[-1]
+
+    @classmethod
     async def get_pod_metrics(cls, service, config: Config,
-                              logger: Logger) -> Dict:
+                              logger: Logger) -> List[Dict[str, any]]:
         """
         Get the average CPU units and memory bytes
-        consumed by all the running pods of a service
+        consumed by all the running pods of a service,
+        group by tag
         """
-        total_cpu = 0
-        total_memory = 0
-        average_cpu = None
-        average_memory = None
+        cpu_units = defaultdict(list)
+        memory_bytes = defaultdict(list)
 
+        # Get metrics
         prefix = Kubernetes._get_api_path_prefix('metrics')
         labels = cls.get_service_labels(service)
         qs = urllib.parse.urlencode({
@@ -91,45 +108,56 @@ class ServiceUsage:
                                              f'{prefix}/pods?{qs}')
         Kubernetes.raise_if_not_2xx(res)
         body = json.loads(res.body, encoding='utf-8')
-        num_pods = len(body['items'])
         for pod in body['items']:
             # Assert 1:1 container to pod mapping
             if len(pod['containers']) > 1:
                 raise K8sError(
                     message=f'Found {len(pod["containers"])} containers '
-                    f'in pod {pod["metadata"]["name"]}, expected 1')
+                    f'in pod {pod["metadata"]["name"]}, expected 1'
+                )
+            # Get tag of the image that this pod is running
+            tag = await cls.get_pod_image_tag(config, logger, pod)
             # Convert metrics to standard units (no suffix)
-            total_cpu += cls.cpu_units(pod['containers'][0]['usage']['cpu'])
-            total_memory += cls.memory_bytes(
-                pod['containers'][0]['usage']['memory'])
+            cpu_units[tag].append(cls.cpu_units(
+                pod['containers'][0]['usage']['cpu']
+            ))
+            memory_bytes[tag].append(cls.memory_bytes(
+                pod['containers'][0]['usage']['memory']
+            ))
 
-        if num_pods > 0:
-            average_cpu = total_cpu / num_pods
-            average_memory = total_memory / num_pods
-
-        return {
-            'average_cpu': average_cpu,
-            'average_memory': average_memory,
-            'num_pods': num_pods
-        }
+        return [
+            {
+                'service_uuid': service['uuid'],
+                'tag': tag,
+                'cpu_units': np.percentile(cpu_units[tag], 95),
+                'memory_bytes': np.percentile(memory_bytes[tag], 95)
+            }
+            for tag in cpu_units.keys()
+        ]
 
     @classmethod
     async def record_service_usage(cls, config: Config, logger: Logger):
         from .Service import Service
         while not Service.shutting_down:
+            # Split services into batches,
+            # Record metrics for all services in a given batch in parallel
+            bulk_update_data = []
             all_services = Database.get_all_services(config)
-            for service in all_services:
-                # Get cpu, memory average for all running pods of the service
-                metrics = await cls.get_pod_metrics(service, config, logger)
-                if metrics['num_pods'] == 0:
-                    # No running pods found, nothing to do here
-                    continue
-                # Get stored metrics (past cpu, mem averages) of the service
-                usage = Database.get_service_usage(config, service)
-                # Add new set of entries to the usage arrays
-                usage['cpu_units'].append(metrics['average_cpu'])
-                usage['memory_bytes'].append(metrics['average_memory'])
-                Database.update_service_usage(config, service, usage)
+            for i in range(0, len(all_services), cls.BATCH_SIZE):
+                current_batch = all_services[i: i + cls.BATCH_SIZE]
+                current_data = await asyncio.gather(*[
+                    cls.get_pod_metrics(service, config, logger)
+                    for service in current_batch
+                ])
+                bulk_update_data += [
+                    tag_data
+                    for service_data in current_data
+                    for tag_data in service_data
+                ]
+            # Create default records for all new (service_uuid, tag) pairs
+            Database.create_service_usage(config, bulk_update_data)
+            Database.update_service_usage(config, bulk_update_data)
+            # Sleep before updating metrics again
             await asyncio.sleep(cls.WAIT_PERIOD)
 
     @classmethod

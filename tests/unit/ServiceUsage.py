@@ -84,27 +84,52 @@ def test_cpu_units(patch, value):
 
 
 @mark.parametrize('value', [{
-    'pod_metrics': {
-        'average_cpu': None,
-        'average_memory': None,
-        'num_pods': 0
+    'pod': {
+        'metadata': {
+            'namespace': 'pod_namespace',
+            'name': 'pod_name',
+        }
     },
-    'usage_db': {},
-    'final': {}
-}, {
-    'pod_metrics': {
-        'average_cpu': 0.05,
-        'average_memory': 12345,
-        'num_pods': 3
-    },
-    'usage_db': {
-        'cpu_units': [0.04],
-        'memory_bytes': [54321]
-    },
-    'final': {
-        'cpu_units': [0.04, 0.05],
-        'memory_bytes': [54321, 12345]
+    'container': {
+        'spec': {
+            'containers': [{
+                'image': 'microservices/slack:latest'
+            }]
+        }
     }
+}])
+@mark.asyncio
+async def test_get_pod_image_tag(patch, async_mock, app, value):
+
+    pod = value['pod']
+    container = json.dumps(value['container'])
+
+    res = mock.MagicMock()
+    res.code = 200
+    res.body = container
+
+    patch.object(Kubernetes, 'make_k8s_call', new=async_mock(return_value=res))
+
+    ret = await ServiceUsage.get_pod_image_tag(app.config, app.logger, pod)
+    assert ret == 'latest'
+
+    prefix = Kubernetes._get_api_path_prefix('pods')
+    expected_path = f'{prefix}/{pod["metadata"]["namespace"]}' \
+        f'/pods/{pod["metadata"]["name"]}'
+
+    Kubernetes.make_k8s_call.mock.assert_called_with(app.config, app.logger,
+                                                     expected_path)
+
+
+@mark.parametrize('value', [{
+    'pod_metrics': [],
+}, {
+    'pod_metrics': [{
+        'service_uuid': 'first_service_uuid',
+        'tag': 'latest',
+        'memory_bytes': 12345,
+        'cpu_units': 0.05,
+    }],
 }])
 @mark.asyncio
 async def test_record_service_usage(patch, async_mock, app, value):
@@ -114,39 +139,30 @@ async def test_record_service_usage(patch, async_mock, app, value):
     def side_effect(*args, **kwargs):
         Service.shutting_down = True
 
-    usage_db = value['usage_db']
     pod_metrics = value['pod_metrics']
 
     patch.object(Database, 'get_all_services',
-                 return_value=[value])
+                 return_value=['first_service'])
     patch.object(ServiceUsage, 'get_pod_metrics',
                  new=async_mock(return_value=pod_metrics))
-    patch.object(Database, 'get_service_usage',
-                 return_value=usage_db)
+    patch.object(Database, 'create_service_usage')
     patch.object(Database, 'update_service_usage')
 
     patch.object(asyncio, 'sleep', new=async_mock(side_effect=side_effect))
 
     await ServiceUsage.record_service_usage(app.config, app.logger)
 
-    if value['pod_metrics']['num_pods'] == 0:
-        Database.get_service_usage.assert_not_called()
-        Database.update_service_usage.assert_not_called()
-    else:
-        Database.get_service_usage.assert_called_with(app.config, value)
-        Database.update_service_usage.assert_called_with(app.config, value,
-                                                         value['final'])
+    Database.create_service_usage.assert_called_with(app.config,
+                                                     pod_metrics)
+    Database.update_service_usage.assert_called_with(app.config,
+                                                     pod_metrics)
 
 
 @mark.parametrize('value', [{
     'k8s_response': {
         'items': []
     },
-    'metrics': {
-        'average_cpu': None,
-        'average_memory': None,
-        'num_pods': 0
-    }
+    'metrics': []
 }, {
     'k8s_response': {
         'items': [{
@@ -163,15 +179,17 @@ async def test_record_service_usage(patch, async_mock, app, value):
             }]
         }],
     },
-    'metrics': {
-        'average_cpu': pytest.approx(0.009),
-        'average_memory': pytest.approx(30003200.0),
-        'num_pods': 2
-    }
+    'metrics': [{
+        'cpu_units': pytest.approx(0.0135),
+        'memory_bytes': pytest.approx(37136384.0),
+        'tag': 'latest',
+        'service_uuid': 'service_uuid',
+    }]
 }])
 @mark.asyncio
 async def test_get_pod_metrics(patch, async_mock, app, value):
     service = {
+        'uuid': 'service_uuid',
         'username': 'service_owner_username',
         'name': 'service_name',
         'alias': 'service_alias'
@@ -181,8 +199,9 @@ async def test_get_pod_metrics(patch, async_mock, app, value):
     res.body = json.dumps(value['k8s_response'])
     res.code = 200
 
-    patch.object(Kubernetes, 'make_k8s_call', new=async_mock(
-        return_value=res))
+    patch.object(Kubernetes, 'make_k8s_call', new=async_mock(return_value=res))
+    patch.object(ServiceUsage, 'get_pod_image_tag',
+                 new=async_mock(return_value='latest'))
 
     ret = await ServiceUsage.get_pod_metrics(service, app.config, app.logger)
 
