@@ -87,17 +87,17 @@ class Database:
             """
             db.cur.execute(query, (app_id,))
             data = db.cur.fetchone()
-        return Release(
-            app_uuid=data['app_uuid'],
-            app_name=data['app_name'],
-            version=data['version'],
-            environment=data['environment'],
-            stories=data['stories'],
-            maintenance=data['maintenance'],
-            always_pull_images=data['always_pull_images'],
-            app_dns=data['app_dns'],
-            state=data['state'],
-            deleted=data['deleted'],
-            owner_uuid=data['owner_uuid'],
-            owner_email=data['owner_email']
-        )
+            return Release(
+                app_uuid=data['app_uuid'],
+                app_name=data['app_name'],
+                version=data['version'],
+                environment=data['environment'],
+                stories=data['stories'],
+                maintenance=data['maintenance'],
+                always_pull_images=data['always_pull_images'],
+                app_dns=data['app_dns'],
+                state=data['state'],
+                deleted=data['deleted'],
+                owner_uuid=data['owner_uuid'],
+                owner_email=data['owner_email']
+            )
