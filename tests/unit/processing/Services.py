@@ -6,7 +6,7 @@ from io import StringIO
 from unittest.mock import MagicMock, Mock
 
 from asyncy.Containers import Containers
-from asyncy.Exceptions import ArgumentTypeMismatchError, AsyncyError
+from asyncy.Exceptions import ArgumentTypeMismatchError, StoryscriptError
 from asyncy.Types import StreamingService
 from asyncy.constants import ContextConstants
 from asyncy.constants.LineConstants import LineConstants as Line, LineConstants
@@ -279,6 +279,13 @@ async def test_services_execute_http(patch, story, async_mock,
             'foo': {
                 'in': location
             }
+        },
+        'output': {
+            'properties': {
+                'foo': {
+                    'type': 'string'
+                }
+            }
         }
     }
 
@@ -330,7 +337,7 @@ async def test_services_execute_http(patch, story, async_mock,
 
     if location == 'invalid_loc' or \
             (location == 'requestBody' and method == 'GET'):
-        with pytest.raises(AsyncyError):
+        with pytest.raises(StoryscriptError):
             await Services.execute_http(story, line, chain, command_conf)
         return
     else:
@@ -369,7 +376,7 @@ async def test_services_execute_http(patch, story, async_mock,
     patch.object(HttpUtils, 'fetch_with_retry',
                  new=async_mock(return_value=response))
 
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await Services.execute_http(story, line, chain, command_conf)
 
 
@@ -416,7 +423,7 @@ def test_parse_output_invalid_cast(story):
         }
     }
 
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         Services.parse_output(command_conf, 'not_an_int', story, {}, '')
 
 
@@ -427,7 +434,7 @@ def test_parse_output_invalid_type(story):
         }
     }
 
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         Services.parse_output(command_conf, 'blah', story, {}, '')
 
 
@@ -577,7 +584,7 @@ async def test_services_execute_external_unknown(patch, story, async_mock):
 
     patch.object(Services, 'start_container', new=async_mock())
 
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await Services.execute_external(story, line)
 
 
@@ -658,7 +665,7 @@ async def test_execute_inline(patch, story, command, simulate_finished,
     line = {}
 
     if simulate_finished:
-        with pytest.raises(AsyncyError):
+        with pytest.raises(StoryscriptError):
             await Services.execute_inline(story, line, chain, command_conf)
         return
     else:
@@ -795,7 +802,7 @@ async def test_when(patch, story, async_mock, service_name):
     assert ret is None
 
     http_res.code = 400
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await Services.when(streaming_service, story, line)
 
 

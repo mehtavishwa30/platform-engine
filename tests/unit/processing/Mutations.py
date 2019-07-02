@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from asyncy.Exceptions import AsyncyError
+from asyncy.Exceptions import StoryscriptError
 from asyncy.processing.Mutations import Mutations
 from asyncy.processing.mutations.StringMutations import StringMutations
 
@@ -15,7 +15,7 @@ def test_mutations_unexpected_type(story):
         'mutation': 'foo'
     }
 
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         Mutations.mutate(mutation, Mutations, story, None)
 
 
@@ -24,7 +24,7 @@ def test_mutations_unexpected_mutation(story):
         'mutation': 'foo'
     }
 
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         Mutations.mutate(mutation, 'string', story, None)
 
 
@@ -37,5 +37,5 @@ def test_mutations_handler_exception(story, patch):
         'mutation': 'replace'
     }
 
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         Mutations.mutate(mutation, 'string', story, None)

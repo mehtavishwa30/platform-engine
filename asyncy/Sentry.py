@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from raven import Client
 
-from .Exceptions import AsyncyError
+from .Exceptions import StoryscriptError
 from .Stories import Stories
 
 
@@ -34,7 +34,7 @@ class Sentry:
 
         cls._sentry_client.context.clear()
 
-        if isinstance(exc_info, AsyncyError):
+        if isinstance(exc_info, StoryscriptError):
             story = exc_info.story
             line = exc_info.line
 

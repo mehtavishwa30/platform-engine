@@ -7,12 +7,12 @@ import threading
 
 import psycopg2
 
-from .App import App
+from .App import App, AppData
 from .AppConfig import AppConfig, KEY_EXPOSE
 from .Config import Config
 from .Containers import Containers
 from .DeploymentLock import DeploymentLock
-from .Exceptions import AsyncyError, TooManyActiveApps, TooManyServices, \
+from .Exceptions import StoryscriptError, TooManyActiveApps, TooManyServices, \
     TooManyVolumes
 from .GraphQLAPI import GraphQLAPI
 from .Logger import Logger
@@ -20,6 +20,7 @@ from .Sentry import Sentry
 from .constants.ServiceConstants import ServiceConstants
 from .db.Database import Database
 from .enums.ReleaseState import ReleaseState
+from .utils.Dict import Dict
 
 MAX_VOLUMES_BETA = 15
 MAX_SERVICES_BETA = 15
@@ -46,10 +47,10 @@ class Apps:
         return AppConfig(raw)
 
     @classmethod
-    async def deploy_release(cls, config, app_id, app_dns,
+    async def deploy_release(cls, config, app_id, app_name, app_dns,
                              version, environment, stories,
                              maintenance: bool, always_pull_images: bool,
-                             deleted: bool, owner_uuid):
+                             deleted: bool, owner_uuid, owner_email):
         logger = cls.make_logger_for_app(config, app_id, version)
         logger.info(f'Deploying app {app_id}@{version}')
 
@@ -98,9 +99,23 @@ class Apps:
 
             app_config = cls.get_app_config(raw=stories.get('yaml', {}))
 
-            app = App(app_id, app_dns, version, config, logger,
-                      stories, services, always_pull_images,
-                      environment, owner_uuid, app_config)
+            app = App(
+                app_data=AppData(
+                    app_id=app_id,
+                    app_name=app_name,
+                    app_dns=app_dns,
+                    version=version,
+                    config=config,
+                    logger=logger,
+                    stories=stories,
+                    services=services,
+                    always_pull_images=always_pull_images,
+                    environment=environment,
+                    owner_uuid=owner_uuid,
+                    owner_email=owner_email,
+                    app_config=app_config
+                )
+            )
 
             await Containers.clean_app(app)
 
@@ -115,7 +130,7 @@ class Apps:
         except BaseException as e:
             Database.update_release_state(logger, config, app_id, version,
                                           ReleaseState.FAILED)
-            if isinstance(e, AsyncyError):
+            if isinstance(e, StoryscriptError):
                 logger.error(str(e))
             else:
                 logger.error(f'Failed to bootstrap app ({e})', exc=e)
@@ -175,7 +190,7 @@ class Apps:
             all_services.append(expose_conf['service'])
 
         for service in all_services:
-            conf = asyncy_yaml.get('services', {}).get(service, {})
+            conf = Dict.find(asyncy_yaml, f'services.{service}', {})
             # query the Hub for the OMG
             tag = conf.get('tag', 'latest')
 
@@ -256,21 +271,20 @@ class Apps:
                              f'app {app_id}@{release.version}. '
                              f'Halting deployment.')
                 return
-
-            print(release)
-
             await asyncio.wait_for(
                 cls.deploy_release(
-                    config, app_id, release.app_dns, release.version,
+                    config, app_id, release.app_name,
+                    release.app_dns, release.version,
                     release.environment, release.stories,
                     release.maintenance, release.always_pull_images,
-                    release.deleted, release.owner_uuid),
+                    release.deleted, release.owner_uuid,
+                    release.owner_email),
                 timeout=5 * 60)
             glogger.info(f'Reloaded app {app_id}@{release.version}')
         except BaseException as e:
             glogger.error(
                 f'Failed to reload app {app_id}', exc=e)
-            Sentry.capture_exc(e)
+            Sentry.capture_exc(exc_info=e)
             if isinstance(e, asyncio.TimeoutError):
                 logger = cls.make_logger_for_app(config, app_id,
                                                  release.version)

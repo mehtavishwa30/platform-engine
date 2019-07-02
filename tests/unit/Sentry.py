@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from asyncy.Exceptions import AsyncyError
+from asyncy.Exceptions import StoryscriptError
 from asyncy.Sentry import Sentry
 
 from raven import Client
@@ -31,8 +31,8 @@ def test_capture_exc(patch, magic):
     line['ln'] = '28'
 
     try:
-        raise AsyncyError(message='foo', story=story, line=line)
-    except AsyncyError as e:
+        raise StoryscriptError(message='foo', story=story, line=line)
+    except StoryscriptError as e:
         Sentry.capture_exc(e, story, line, {'foo': 'bar'})
 
     Client.user_context.assert_called_with({

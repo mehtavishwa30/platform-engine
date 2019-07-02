@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from unittest.mock import MagicMock
 
-from asyncy.Exceptions import AsyncyError
+from asyncy.Exceptions import StoryscriptError
 from asyncy.processing.Services import Services
 from asyncy.processing.internal import Http
 from asyncy.utils.HttpUtils import HttpUtils
@@ -77,7 +77,7 @@ async def test_service_http_fetch(patch, story, line, json_response,
         fetch_mock.body = 'hello world!'.encode('utf-8')
 
     if round(method[1] / 100) != 2:
-        with pytest.raises(AsyncyError):
+        with pytest.raises(StoryscriptError):
             await Http.http_post(story, line, resolved_args)
     else:
         result = await Http.http_post(story, line, resolved_args)

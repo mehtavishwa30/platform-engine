@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 
-from asyncy.Exceptions import AsyncyError
+from asyncy.Exceptions import StoryscriptError
 from asyncy.processing.Services import Services
 from asyncy.processing.internal import File
 
@@ -57,7 +57,7 @@ async def test_service_file_write_exc(patch, story, line, service_patch, exc):
     resolved_args = {
         'path': 'my_path'
     }
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await File.file_write(story, line, resolved_args)
 
 
@@ -79,7 +79,7 @@ async def test_service_file_read_exc(patch, story, line, service_patch, exc):
     resolved_args = {
         'path': 'my_path'
     }
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await File.file_read(story, line, resolved_args)
 
 

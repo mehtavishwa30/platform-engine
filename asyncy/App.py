@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import json
+import typing
 from collections import namedtuple
 
 from requests.structures import CaseInsensitiveDict
@@ -10,7 +11,7 @@ from tornado.httpclient import AsyncHTTPClient
 from .AppConfig import AppConfig, Expose
 from .Config import Config
 from .Containers import Containers
-from .Exceptions import AsyncyError
+from .Exceptions import StoryscriptError
 from .Logger import Logger
 from .Stories import Stories
 from .Types import StreamingService
@@ -22,6 +23,22 @@ from .utils.HttpUtils import HttpUtils
 
 Subscription = namedtuple('Subscription',
                           ['streaming_service', 'id', 'payload', 'event'])
+
+AppData = namedtuple('AppData', {
+    'app_id': str,
+    'app_name': str,
+    'app_dns': str,
+    'version': int,
+    'config': Config,
+    'logger': Logger,
+    'stories': dict,
+    'services': dict,
+    'always_pull_images': bool,
+    'environment': typing.Union[dict, None],
+    'owner_uuid': str,
+    'owner_email': typing.Union[str, None],
+    'app_config': AppConfig
+})
 
 
 class App:
@@ -35,26 +52,28 @@ class App:
     The runtime config for this app.
     """
 
-    def __init__(self, app_id: str, app_dns: str, version: int, config: Config,
-                 logger: Logger, stories: dict, services: dict,
-                 always_pull_images: bool, environment: dict,
-                 owner_uuid: str, app_config: AppConfig):
+    def __init__(self, app_data: AppData):
         self._subscriptions = {}
-        self.app_id = app_id
-        self.app_dns = app_dns
-        self.config = config
-        self.app_config = app_config
-        self.version = version
-        self.logger = logger
-        self.owner_uuid = owner_uuid
-        if environment is None:
-            environment = {}
+        self.app_id = app_data.app_id
+        self.app_name = app_data.app_name
+        self.app_dns = app_data.app_dns
+        self.config = app_data.config
+        self.app_config = app_data.app_config
+        self.version = app_data.version
+        self.logger = app_data.logger
+        self.owner_uuid = app_data.owner_uuid
+        self.owner_email = app_data.owner_email
+        self.environment = app_data.environment
+        if app_data.environment is None:
+            self.environment = {}
+        else:
+            self.environment = app_data.environment
 
-        self.environment = CaseInsensitiveDict(data=environment)
-        self.stories = stories['stories']
-        self.entrypoint = stories['entrypoint']
-        self.services = services
-        self.always_pull_images = always_pull_images
+        self.environment = CaseInsensitiveDict(data=self.environment)
+        self.stories = app_data.stories['stories']
+        self.entrypoint = app_data.stories['entrypoint']
+        self.services = app_data.services
+        self.always_pull_images = app_data.always_pull_images
         secrets = CaseInsensitiveDict()
         for k, v in self.environment.items():
             if not isinstance(v, dict):
@@ -88,15 +107,15 @@ class App:
                          f'.{ServiceConstants.config}'
                          f'.expose.{e.service_expose_name}')
         if conf is None:
-            raise AsyncyError(
+            raise StoryscriptError(
                 message=f'Configuration for expose "{e.service_expose_name}" '
                 f'not found in service "{e.service}"')
 
-        target_path = conf.get('http', {}).get('path')
-        target_port = conf.get('http', {}).get('port')
+        target_path = Dict.find(conf, 'http.path')
+        target_port = Dict.find(conf, 'http.port')
 
         if target_path is None or target_port is None:
-            raise AsyncyError(
+            raise StoryscriptError(
                 message=f'http.path or http.port is null '
                 f'for expose {e.service}/{e.service_expose_name}')
 

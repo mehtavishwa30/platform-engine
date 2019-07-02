@@ -3,10 +3,10 @@ import asyncio
 import json
 from collections import deque
 
-from asyncy.App import App
+from asyncy.App import App, AppData
 from asyncy.AppConfig import Expose
 from asyncy.Containers import Containers
-from asyncy.Exceptions import AsyncyError
+from asyncy.Exceptions import StoryscriptError
 from asyncy.Kubernetes import Kubernetes
 from asyncy.Types import StreamingService
 from asyncy.constants.ServiceConstants import ServiceConstants
@@ -31,8 +31,21 @@ def exc(patch):
 
 @fixture
 def app(config, logger, magic):
-    return App('app_id', 'app_dns', logger, config,
-               magic(), magic(), magic(), False, {}, 'owner_uuid', magic())
+    return App(app_data=AppData(
+        app_id='app_id',
+        app_name='app_name',
+        app_dns='app_dns',
+        config=config,
+        logger=logger,
+        version=magic(),
+        stories=magic(),
+        services={},
+        always_pull_images=False,
+        owner_uuid='owner_uuid',
+        owner_email='example@example.com',
+        environment={},
+        app_config=magic()
+    ))
 
 
 def test_add_subscription(patch, app, magic):
@@ -119,7 +132,8 @@ async def test_unsubscribe_all(patch, app, async_mock, magic, response_code):
 
 
 @mark.parametrize('env', [{'env': True}, None, {'a': {'nested': '1'}}])
-def test_app_init(magic, config, logger, env):
+@mark.parametrize('always_pull_images', [False, True])
+def test_app_init(magic, config, logger, env, always_pull_images):
     services = magic()
     stories = magic()
     expected_secrets = {}
@@ -131,8 +145,22 @@ def test_app_init(magic, config, logger, env):
     version = 100
     app_config = magic()
     config.APP_DOMAIN = 'asyncyapp.com'
-    app = App('app_id', 'app_dns', version, config, logger,
-              stories, services, False, env, 'owner_1', app_config)
+
+    app = App(app_data=AppData(
+        app_id='app_id',
+        app_name='app_name',
+        app_dns='app_dns',
+        version=version,
+        config=config,
+        logger=logger,
+        stories=stories,
+        services=services,
+        always_pull_images=always_pull_images,
+        environment=env,
+        owner_uuid='owner_1',
+        owner_email='example@example.com',
+        app_config=app_config
+    ))
 
     if env is None:
         env = {}
@@ -142,9 +170,10 @@ def test_app_init(magic, config, logger, env):
     assert app.config == config
     assert app.logger == logger
     assert app.owner_uuid == 'owner_1'
+    assert app.owner_email == 'example@example.com'
     assert app.stories == stories['stories']
     assert app.services == services
-    assert not app.always_pull_images
+    assert app.always_pull_images == always_pull_images
     assert app.environment == env
     assert app.app_context['hostname'] == f'{app.app_dns}.asyncyapp.com'
     assert app.app_context['version'] == version
@@ -292,7 +321,7 @@ async def test_expose_service(patch, app, async_mock, no_config, no_http_path):
                http_path='/expose_external_path')
 
     if no_config or no_http_path:
-        with pytest.raises(AsyncyError):
+        with pytest.raises(StoryscriptError):
             await app._expose_service(e)
     else:
         await app._expose_service(e)
@@ -344,7 +373,7 @@ async def test_clear_subscriptions_synapse(patch, app, async_mock,
     app.config.ASYNCY_SYNAPSE_PORT = 9000
 
     expected_url = f'http://{app.config.ASYNCY_SYNAPSE_HOST}:' \
-                   f'{app.config.ASYNCY_SYNAPSE_PORT}/clear_all'
+        f'{app.config.ASYNCY_SYNAPSE_PORT}/clear_all'
 
     expected_kwargs = {
         'method': 'POST',

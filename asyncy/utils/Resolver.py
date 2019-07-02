@@ -2,7 +2,7 @@
 import re
 
 from .TypeResolver import TypeResolver
-from ..Exceptions import AsyncyRuntimeError
+from ..Exceptions import StoryscriptRuntimeError
 
 
 class Resolver:
@@ -50,7 +50,7 @@ class Resolver:
                     item = item[resolved]
             return item
         except IndexError:
-            raise AsyncyRuntimeError(
+            raise StoryscriptRuntimeError(
                 message=f'List index out of bounds: {resolved}')
         except (KeyError, TypeError):
             return None

@@ -2,6 +2,8 @@
 import typing
 from collections import namedtuple
 
+from .utils.Dict import Dict
+
 Expose = namedtuple('Expose',
                     ['service', 'service_expose_name', 'http_path'])
 
@@ -16,7 +18,7 @@ class AppConfig:
         for expose in raw.get(KEY_EXPOSE, []):
             e = Expose(service=expose.get('service'),
                        service_expose_name=expose.get('name'),
-                       http_path=expose.get('http', {}).get('path'))
+                       http_path=Dict.find(expose, 'http.path'))
 
             assert e.service is not None
             assert e.service_expose_name is not None

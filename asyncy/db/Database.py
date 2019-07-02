@@ -42,11 +42,14 @@ class Database:
     def get_container_configs(cls, app, registry_url):
         with cls.new_pg_cur(app.config) as db:
             query = """
-            with containerconfigs as (select name, owner_uuid, containerconfig,
-                                             json_object_keys(
-                                                 (containerconfig->>'auths')::json
-                                             ) registry
-                                      from app_public.owner_containerconfigs)
+            with containerconfigs as (
+            select name,
+            owner_uuid, containerconfig,
+            json_object_keys(
+                (containerconfig->>'auths')::json
+            ) registry
+            from app_public.owner_containerconfigs
+            )
             select name, containerconfig
             from containerconfigs
             where owner_uuid = %s and registry = %s
@@ -55,8 +58,10 @@ class Database:
             data = db.cur.fetchall()
             result = []
             for config in data:
-                result.append(ContainerConfig(name=config['name'],
-                                              data=config['containerconfig']))
+                result.append(ContainerConfig(
+                    name=config['name'],
+                    data=config['containerconfig'])
+                )
             return result
 
     @classmethod
@@ -68,23 +73,31 @@ class Database:
                             where state != 'NO_DEPLOY'::release_state
                             group by app_uuid)
             select app_uuid, id as version, config environment,
-                   payload stories,
+                   payload stories, apps.name as app_name,
                    maintenance, always_pull_images,
                    hostname app_dns, state, deleted,
-                   apps.owner_uuid
+                   apps.owner_uuid, owner_emails.email as owner_email
             from latest
                    inner join releases using (app_uuid, id)
                    inner join apps on (latest.app_uuid = apps.uuid)
                    inner join app_dns using (app_uuid)
+                   left join app_public.owner_emails on
+                    (apps.owner_uuid = owner_emails.owner_uuid)
             where app_uuid = %s;
             """
             db.cur.execute(query, (app_id,))
             data = db.cur.fetchone()
-            return Release(app_uuid=data['app_uuid'], version=data['version'],
-                           environment=data['environment'],
-                           stories=data['stories'],
-                           maintenance=data['maintenance'],
-                           always_pull_images=data['always_pull_images'],
-                           app_dns=data['app_dns'],
-                           state=data['state'], deleted=data['deleted'],
-                           owner_uuid=data['owner_uuid'])
+        return Release(
+            app_uuid=data['app_uuid'],
+            app_name=data['app_name'],
+            version=data['version'],
+            environment=data['environment'],
+            stories=data['stories'],
+            maintenance=data['maintenance'],
+            always_pull_images=data['always_pull_images'],
+            app_dns=data['app_dns'],
+            state=data['state'],
+            deleted=data['deleted'],
+            owner_uuid=data['owner_uuid'],
+            owner_email=data['owner_email']
+        )

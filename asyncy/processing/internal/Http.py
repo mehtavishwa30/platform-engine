@@ -6,7 +6,7 @@ import certifi
 from tornado.httpclient import AsyncHTTPClient
 
 from .Decorators import Decorators
-from ...Exceptions import AsyncyError
+from ...Exceptions import StoryscriptError
 from ...utils.HttpUtils import HttpUtils
 
 
@@ -43,7 +43,7 @@ async def http_post(story, line, resolved_args):
         except UnicodeDecodeError:
             pass
 
-        raise AsyncyError(
+        raise StoryscriptError(
             story=story,
             line=line,
             message=f'Failed to make HTTP call: {response.error}; '

@@ -4,6 +4,7 @@ import typing
 
 Release = typing.NamedTuple('Release', [
     ('app_uuid', str),
+    ('app_name', str),
     ('version', int),
     ('environment', dict),
     ('stories', typing.Union[dict, None]),
@@ -13,4 +14,5 @@ Release = typing.NamedTuple('Release', [
     ('state', str),
     ('deleted', bool),
     ('owner_uuid', str),
+    ('owner_email', typing.Union[str, None])
 ])

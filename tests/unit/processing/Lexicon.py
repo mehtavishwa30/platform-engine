@@ -3,7 +3,7 @@ from unittest import mock
 from unittest.mock import MagicMock, Mock
 
 from asyncy import Metrics
-from asyncy.Exceptions import AsyncyError, InvalidKeywordUsage
+from asyncy.Exceptions import InvalidKeywordUsage, StoryscriptError
 from asyncy.Stories import Stories
 from asyncy.Types import StreamingService
 from asyncy.constants.LineConstants import LineConstants
@@ -127,7 +127,7 @@ async def test_lexicon_set_invalid_operation(patch, logger, story):
         ],
         'next': '2'
     }
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await Lexicon.set(logger, story, line)
 
 
@@ -219,7 +219,7 @@ def test__is_if_condition_true_complex(patch, story):
     line = {
         'args': ['my_condition', 'my_condition_2']
     }
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         Lexicon._is_if_condition_true(story, line)
 
 
@@ -435,7 +435,7 @@ async def test_lexicon_when(patch, story, async_mock, service_name):
     patch.object(Lexicon, 'line_number_or_none')
 
     if service_name == 'unknown_service':
-        with pytest.raises(AsyncyError):
+        with pytest.raises(StoryscriptError):
             await Lexicon.when(story.logger, story, line)
     else:
         ret = await Lexicon.when(story.logger, story, line)
@@ -474,7 +474,7 @@ async def test_return_used_outside_when(patch, logger, story):
     tree = {
         '1': {'ln': '1', 'method': 'return'},
     }
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await Lexicon.ret(logger, story, tree['1'])
 
 
@@ -483,7 +483,7 @@ async def test_return_used_with_args(patch, logger, story):
     tree = {
         '1': {'ln': '1', 'method': 'return', 'args': [{}]},
     }
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await Lexicon.ret(logger, story, tree['1'])
 
 
@@ -496,5 +496,5 @@ def test_next_line_or_none():
 @mark.asyncio
 async def test_lexicon_when_invalid(story):
     line = {'service': 'foo', 'command': 'bar'}
-    with pytest.raises(AsyncyError):
+    with pytest.raises(StoryscriptError):
         await Lexicon.when(story.logger, story, line)

@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-from asyncy.Exceptions import AsyncyError, TooManyActiveApps, \
+from asyncy.Exceptions import StoryscriptError, TooManyActiveApps, \
     TooManyServices, TooManyVolumes
 
 from pytest import mark, raises
 
 
 def test_asyncy_error():
-    with raises(AsyncyError):
-        raise AsyncyError('things happen')
+    with raises(StoryscriptError):
+        raise StoryscriptError('things happen')
 
 
 def test_many_volumes():
@@ -21,8 +21,8 @@ def test_many_apps():
 
 
 def test_no_trace_available():
-    err = AsyncyError(message='my_message')
-    assert str(err) == 'AsyncyError: my_message'
+    err = StoryscriptError(message='my_message')
+    assert str(err) == 'StoryscriptError: my_message'
 
 
 @mark.parametrize('with_root', [True, False])
@@ -41,8 +41,8 @@ def test_exception_trace(magic, patch, story, with_root):
 
     story.name = 'story_name'
 
-    ex = AsyncyError(message='unknown error',
-                     story=story, line=magic(), root=root)
+    ex = StoryscriptError(message='unknown error',
+                          story=story, line=magic(), root=root)
 
     # We cache the result of str(ex) because if we don't, __str__ will run
     # again, and will then throw a StopIteration exception since

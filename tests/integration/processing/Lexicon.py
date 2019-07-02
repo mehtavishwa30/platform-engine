@@ -3,7 +3,7 @@ import re
 import sys
 from unittest.mock import MagicMock
 
-from asyncy.Exceptions import AsyncyError, AsyncyRuntimeError,\
+from asyncy.Exceptions import StoryscriptError, StoryscriptRuntimeError, \
     TypeAssertionRuntimeError, TypeValueRuntimeError
 from asyncy.Stories import Stories
 from asyncy.processing import Story
@@ -267,7 +267,7 @@ class TestSuite:
                      assertion=ContextAssertion(key='b', expected=0)),
             TestCase(append='b = a[10]',
                      assertion=RuntimeExceptionAssertion(
-                         exception_type=AsyncyRuntimeError))
+                         exception_type=StoryscriptRuntimeError))
         ]
     ),
     TestSuite(
@@ -655,7 +655,7 @@ async def run_test_case_in_suite(suite: TestSuite, case: TestCase, logger):
     story.prepare(context)
     try:
         await Story.execute(logger, story)
-    except AsyncyError as e:
+    except StoryscriptError as e:
         try:
             assert isinstance(case.assertion, RuntimeExceptionAssertion)
             case.assertion.verify(e)
