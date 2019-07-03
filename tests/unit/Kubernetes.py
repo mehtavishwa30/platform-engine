@@ -597,9 +597,11 @@ async def test_create_ingress(patch, app, async_mock, resource_exists,
 
 
 @mark.asyncio
-async def test_create_deployment(patch, async_mock, story):
+@mark.parametrize('always_pull_images', [True, False])
+async def test_create_deployment(patch, async_mock, story, always_pull_images):
     container_name = 'asyncy--alpine-1'
     story.app.app_id = 'my_app'
+    story.app.always_pull_images = always_pull_images
     image = 'alpine:latest'
 
     env = {'token': 'asyncy-19920', 'username': 'asyncy'}
@@ -643,6 +645,11 @@ async def test_create_deployment(patch, async_mock, story):
     patch.object(Kubernetes, 'create_imagepullsecret', new=async_mock())
     patch.object(Kubernetes, 'get_liveness_probe', return_value=liveness_probe)
 
+    if story.app.always_pull_images is True:
+        image_pull_policy = 'Always'
+    else:
+        image_pull_policy = 'IfNotPresent'
+
     b16_service_name = base64.b16encode('alpine'.encode()).decode()
 
     expected_payload = {
@@ -682,7 +689,7 @@ async def test_create_deployment(patch, async_mock, story):
                                 }
                             },
                             'command': start_command,
-                            'imagePullPolicy': 'IfNotPresent',
+                            'imagePullPolicy': image_pull_policy,
                             'env': [{'name': 'token', 'value': 'asyncy-19920'},
                                     {'name': 'username', 'value': 'asyncy'}],
                             'lifecycle': {
