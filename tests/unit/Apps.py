@@ -178,6 +178,7 @@ async def test_reload_app_no_story(patch, config, logger, db, async_mock):
         environment={},
         stories=None,
         maintenance=False,
+        always_pull_images=False,
         app_dns='app_dns',
         state='QUEUED',
         deleted=True,
@@ -220,6 +221,7 @@ async def test_reload_app(patch, config, logger, db, async_mock,
         environment={},
         stories={},
         maintenance=False,
+        always_pull_images=False,
         app_dns=app_dns,
         state=previous_state,
         deleted=True,
@@ -239,10 +241,7 @@ async def test_reload_app(patch, config, logger, db, async_mock,
         return
 
     Apps.deploy_release.mock.assert_called_with(
-        config, app_id, app_name, app_dns,
-        release.version, release.environment, release.stories,
-        release.maintenance, release.deleted,
-        release.owner_uuid, release.owner_email
+        config=config, release=release
     )
 
     if raise_exc:
@@ -269,9 +268,21 @@ async def test_deploy_release_many_services(patch):
         stories['services'][f'service_{i}'] = {}
 
     await Apps.deploy_release(
-        {}, 'app_id', 'app_name', 'app_dns',
-        'app_version', {}, stories, False, False,
-        'owner_uuid', 'example@example.com'
+        config={},
+        release=Release(
+            app_uuid='app_id',
+            app_name='app_name',
+            version='app_version',
+            environment={},
+            stories=stories,
+            maintenance=False,
+            always_pull_images=False,
+            app_dns='app_dns',
+            state='QUEUED',
+            deleted=False,
+            owner_uuid='owner_uuid',
+            owner_email='example@example.com'
+        )
     )
 
     TooManyServices.__init__.assert_called_with(20, 15)
@@ -286,7 +297,6 @@ async def test_deploy_release_many_apps(patch, magic):
     patch.object(TooManyActiveApps, '__str__', return_value='too_many')
 
     stories = {'services': {}}
-
     Apps.apps = {}
 
     try:
@@ -295,12 +305,20 @@ async def test_deploy_release_many_apps(patch, magic):
             Apps.apps[f'app_{i}'].owner_uuid = 'owner_uuid'
             stories['services'][f'service_{i}'] = {}
 
-        await Apps.deploy_release(
-            {}, 'app_id', 'app_name',
-            'app_dns', 'app_version', {},
-            stories, False, False,
-            'owner_uuid', 'example@example.com'
-        )
+        await Apps.deploy_release(config={}, release=Release(
+            app_uuid='app_id',
+            app_name='app_name',
+            version='app_version',
+            environment={},
+            stories=stories,
+            maintenance=False,
+            always_pull_images=False,
+            app_dns='app_dns',
+            state='QUEUED',
+            deleted=False,
+            owner_uuid='owner_uuid',
+            owner_email='example@example.com'
+        ))
 
         TooManyActiveApps.__init__.assert_called_with(20, 5)
         Database.update_release_state.assert_called()
@@ -337,12 +355,22 @@ async def test_deploy_release_many_volumes(patch, async_mock):
 
     patch.object(Apps, 'get_services',
                  new=async_mock(return_value=stories['services']))
-
     await Apps.deploy_release(
-        {}, 'app_id', 'app_name',
-        'app_dns', 'app_version', {},
-        stories, False, False,
-        'owner_uuid', 'example@example.com'
+        config={},
+        release=Release(
+            app_uuid='app_id',
+            app_name='app_name',
+            version='app_version',
+            environment={},
+            stories=stories,
+            maintenance=False,
+            always_pull_images=False,
+            app_dns='app_dns',
+            state='QUEUED',
+            deleted=False,
+            owner_uuid='owner_uuid',
+            owner_email='owner_email'
+        )
     )
 
     TooManyVolumes.__init__.assert_called_with(20, 15)
@@ -351,10 +379,12 @@ async def test_deploy_release_many_volumes(patch, async_mock):
 
 @mark.parametrize('raise_exc', [None, exc, asyncy_exc])
 @mark.parametrize('maintenance', [True, False])
+@mark.parametrize('always_pull_images', [True, False])
 @mark.parametrize('deleted', [True, False])
 @mark.asyncio
 async def test_deploy_release(config, magic, patch, deleted,
-                              async_mock, raise_exc, maintenance):
+                              async_mock, raise_exc, maintenance,
+                              always_pull_images):
     patch.object(Sentry, 'capture_exc')
     patch.object(Kubernetes, 'clean_namespace', new=async_mock())
     patch.object(Containers, 'init', new=async_mock())
@@ -374,10 +404,23 @@ async def test_deploy_release(config, magic, patch, deleted,
     else:
         patch.object(App, 'bootstrap', new=async_mock())
 
+    release = Release(
+        app_uuid='app_id',
+        app_name='app_name',
+        version='version',
+        environment='env',
+        stories={'stories': True},
+        maintenance=maintenance,
+        always_pull_images=always_pull_images,
+        app_dns='app_dns',
+        state='QUEUED',
+        deleted=deleted,
+        owner_uuid='owner_uuid',
+        owner_email='owner_email'
+    )
+
     await Apps.deploy_release(
-        config, 'app_id', 'app_name', 'app_dns', 'version', 'env',
-        {'stories': True}, maintenance, deleted,
-        'owner_uuid', 'example@example.com'
+        config=config, release=release
     )
 
     if maintenance:
@@ -392,17 +435,10 @@ async def test_deploy_release(config, magic, patch, deleted,
             app_logger, config, 'app_id', 'version', ReleaseState.DEPLOYING)
 
         App.__init__.assert_called_with(app_data=AppData(
-            app_id='app_id',
-            app_name='app_name',
-            app_dns='app_dns',
-            version='version',
+            release=release,
             config=config,
             logger=app_logger,
-            stories={'stories': True},
             services=services,
-            environment='env',
-            owner_uuid='owner_uuid',
-            owner_email='example@example.com',
             app_config=app_config
         ))
 
