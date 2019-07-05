@@ -54,7 +54,7 @@ class Resolver:
                 message=f'List index out of bounds: {resolved}')
         except KeyError:
             raise StoryscriptRuntimeError(
-                message=f'Invalid key access: {'range'}')
+                message=f'Invalid key access: {path}')
         except TypeError:
             return None
 
