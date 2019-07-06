@@ -52,18 +52,19 @@ class Resolver:
         except IndexError:
             raise StoryscriptRuntimeError(
                 message=f'List index out of bounds: {resolved}')
-        except KeyError:
-            raise StoryscriptRuntimeError(
-                message=f'Invalid key access: {path}')
-        except TypeError:
+        except (KeyError, TypeError):
             return None
 
     @classmethod
     def dictionary(cls, dictionary, data):
+       try:
         result = {}
         for key, value in dictionary.items():
             result[key] = cls.resolve(value, data)
         return result
+       except KeyError:
+            raise StoryscriptRuntimeError(
+                message=f'Invalid key access: {key}')
 
     @classmethod
     def list_object(cls, items, data):
