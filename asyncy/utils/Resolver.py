@@ -57,14 +57,14 @@ class Resolver:
 
     @classmethod
     def dictionary(cls, dictionary, data):
-       try:
-        result = {}
-        for key, value in dictionary.items():
-            result[key] = cls.resolve(value, data)
-        return result
+        try:
+            result = {}
+            for key, value in dictionary.items():
+                result[key] = cls.resolve(value, data)
+            return result
        except KeyError:
-            raise StoryscriptRuntimeError(
-                message=f'Invalid key access: {key}')
+           raise StoryscriptRuntimeError(
+               message=f'Invalid key access: {key}')
 
     @classmethod
     def list_object(cls, items, data):
